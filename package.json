@@ -1,0 +1,62 @@
+{
+  "name": "next-env-space",
+  "version": "1.0.0",
+  "description": "Runtime environment variables for Next.js, validated with zod and grouped into isolated spaces",
+  "keywords": [
+    "next",
+    "nextjs",
+    "env",
+    "environment",
+    "runtime",
+    "zod"
+  ],
+  "author": "infodusha",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "server": [
+        "./dist/server.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist", "README.md", "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "tsc -p tsconfig.typetest.json"
+  },
+  "dependencies": {
+    "server-only": "^0.0.1"
+  },
+  "peerDependencies": {
+    "next": "^16.3.3",
+    "react": "^19.2.8",
+    "zod": "^4.5.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "next": "^16.3.3",
+    "react": "^19.2.8",
+    "typescript": "~7.0.2",
+    "zod": "^4.5.1"
+  }
+}

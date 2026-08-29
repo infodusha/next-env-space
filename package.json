@@ -1,6 +1,6 @@
 {
   "name": "next-env-space",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Runtime environment variables for Next.js, validated with zod and grouped into isolated spaces",
   "keywords": [
     "env",

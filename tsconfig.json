@@ -1,21 +1,12 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    // File Layout
     "rootDir": "./src",
     "outDir": "./dist",
 
     // Environment Settings
-    // See also https://aka.ms/tsconfig/module
-    // `preserve` + `bundler` matches how Next.js resolves modules: `next` has
-    // no "exports" map, so `next/server` is unresolvable under `nodenext`.
-    // Emit stays ESM, and relative imports keep their `.js` extension so the
-    // published `dist` also works in plain Node ESM.
     "module": "preserve",
     "moduleResolution": "bundler",
     "target": "esnext",
-    // The library runs in the browser too, so `window` has to be known.
-    // `types: []` keeps ambient @types (node, jest, ...) out of the public API.
     "lib": ["esnext", "dom"],
     "types": [],
 

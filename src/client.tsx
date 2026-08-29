@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef } from "react";
 import { useServerInsertedHTML } from "next/navigation";
+import { useRef } from "react";
 
 import { envSpacesKey, type RawEnv } from "./global.js";
 

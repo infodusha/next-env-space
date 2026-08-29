@@ -1,10 +1,14 @@
 import * as z from "zod";
 
-import { createEnvSpace, type CreateEnvSpace, type InferEnv } from "../src/index.js";
-import { createEnvSpace as createEnvSpaceRsc } from "../src/index.react-server.js";
-import { getEnvAsync, WithClientEnv } from "../src/server.js";
+import {
+  createEnvSpace,
+  type CreateEnvSpace,
+  type InferEnv,
+} from "../src/index.js";
 import type * as ClientEntry from "../src/index.js";
+import { createEnvSpace as createEnvSpaceRsc } from "../src/index.react-server.js";
 import type * as ServerEntry from "../src/index.react-server.js";
+import { getEnvAsync, WithClientEnv } from "../src/server.js";
 
 // 1. plain shape
 const publicEnv = createEnvSpace(
@@ -12,8 +16,14 @@ const publicEnv = createEnvSpace(
     APP_NAME: z.string(),
     GTM_ID: z.string().optional(),
     INACTIVE_TIMEOUT_SECONDS: z.coerce.number(),
-    RECAPTCHA_IS_ENTERPRISE: z.stringbool({ truthy: ["TRUE"], falsy: ["FALSE"] }),
-    SCANNERS: z.preprocess((v) => JSON.parse(v as string) as unknown, z.record(z.string(), z.string())),
+    RECAPTCHA_IS_ENTERPRISE: z.stringbool({
+      truthy: ["TRUE"],
+      falsy: ["FALSE"],
+    }),
+    SCANNERS: z.preprocess(
+      (v) => JSON.parse(v as string) as unknown,
+      z.record(z.string(), z.string()),
+    ),
   },
   { name: "public" },
 );
@@ -32,7 +42,8 @@ const gtm: string | undefined = publicEnv.getEnv("GTM_ID");
 const timeout: number = publicEnv.getEnv("INACTIVE_TIMEOUT_SECONDS");
 const enterprise: boolean = publicEnv.getEnv("RECAPTCHA_IS_ENTERPRISE");
 const scanners: Record<string, string> = publicEnv.getEnv("SCANNERS");
-const nodeEnv: "production" | "development" | "test" = featureEnv.getEnv("NODE_ENV");
+const nodeEnv: "production" | "development" | "test" =
+  featureEnv.getEnv("NODE_ENV");
 const all: InferEnv<typeof featureEnv.schema> = featureEnv.getAllEnv();
 
 // @ts-expect-error unknown key
@@ -64,7 +75,17 @@ export function Layout() {
   );
 }
 
-export { appName, gtm, timeout, enterprise, scanners, nodeEnv, all, wrong, server };
+export {
+  appName,
+  gtm,
+  timeout,
+  enterprise,
+  scanners,
+  nodeEnv,
+  all,
+  wrong,
+  server,
+};
 
 // Both entry points must expose exactly the same public type, otherwise the
 // `react-server` condition would change the API depending on the layer.

@@ -14,13 +14,13 @@ import { getEnvAsync, WithClientEnv } from "../src/server.js";
 const publicEnv = createEnvSpace(
   {
     APP_NAME: z.string(),
-    GTM_ID: z.string().optional(),
-    INACTIVE_TIMEOUT_SECONDS: z.coerce.number(),
-    RECAPTCHA_IS_ENTERPRISE: z.stringbool({
+    APP_VERSION: z.string().optional(),
+    REQUEST_TIMEOUT_SECONDS: z.coerce.number(),
+    FEATURE_ENABLED: z.stringbool({
       truthy: ["TRUE"],
       falsy: ["FALSE"],
     }),
-    SCANNERS: z.preprocess(
+    SERVICE_URLS: z.preprocess(
       (v) => JSON.parse(v as string) as unknown,
       z.record(z.string(), z.string()),
     ),
@@ -38,10 +38,10 @@ const featureEnv = createEnvSpace(
 );
 
 const appName: string = publicEnv.getEnv("APP_NAME");
-const gtm: string | undefined = publicEnv.getEnv("GTM_ID");
-const timeout: number = publicEnv.getEnv("INACTIVE_TIMEOUT_SECONDS");
-const enterprise: boolean = publicEnv.getEnv("RECAPTCHA_IS_ENTERPRISE");
-const scanners: Record<string, string> = publicEnv.getEnv("SCANNERS");
+const appVersion: string | undefined = publicEnv.getEnv("APP_VERSION");
+const timeout: number = publicEnv.getEnv("REQUEST_TIMEOUT_SECONDS");
+const featureEnabled: boolean = publicEnv.getEnv("FEATURE_ENABLED");
+const serviceUrls: Record<string, string> = publicEnv.getEnv("SERVICE_URLS");
 const nodeEnv: "production" | "development" | "test" =
   featureEnv.getEnv("NODE_ENV");
 const all: InferEnv<typeof featureEnv.schema> = featureEnv.getAllEnv();
@@ -77,10 +77,10 @@ export function Layout() {
 
 export {
   appName,
-  gtm,
+  appVersion,
   timeout,
-  enterprise,
-  scanners,
+  featureEnabled,
+  serviceUrls,
   nodeEnv,
   all,
   wrong,

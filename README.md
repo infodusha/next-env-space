@@ -25,9 +25,9 @@ import { createEnvSpace } from "next-env-space";
 export const publicEnv = createEnvSpace(
   {
     APP_NAME: z.string(),
-    GTM_ID: z.string().optional(),
-    INACTIVE_TIMEOUT_SECONDS: z.coerce.number(),
-    RECAPTCHA_IS_ENTERPRISE: z.stringbool({
+    APP_VERSION: z.string().optional(),
+    REQUEST_TIMEOUT_SECONDS: z.coerce.number(),
+    FEATURE_ENABLED: z.stringbool({
       truthy: ["TRUE"],
       falsy: ["FALSE"],
     }),
@@ -99,7 +99,7 @@ import { publicEnv } from "@/env";
 
 // module scope, client components, route handlers, anywhere outside a render
 const appName = publicEnv.getEnv("APP_NAME"); // string
-const timeout = publicEnv.getEnv("INACTIVE_TIMEOUT_SECONDS"); // number
+const timeout = publicEnv.getEnv("REQUEST_TIMEOUT_SECONDS"); // number
 ```
 
 Inside a Server Component the value would be baked into the prerender, so `getEnv` throws
@@ -127,11 +127,11 @@ leaving the render prerenderable.
 
 Every space needs its own `name` — it is the key the values are published under on the
 client. Spaces are independent: each has its own schema, its own cache and its own
-`WithClientEnv`.
+`WithClientEnv`, so a second public space is rendered next to the first:
 
 ```tsx
 <WithClientEnv space={publicEnv} />
-<WithClientEnv space={analyticsEnv} />
+<WithClientEnv space={featureEnv} />
 ```
 
 ## API

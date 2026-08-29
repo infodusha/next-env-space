@@ -17,15 +17,18 @@ export async function getEnvAsync<
 
 export interface WithClientEnvProps<TSchema extends EnvSchema> {
   readonly space: EnvSpace<TSchema>;
+  readonly nonce?: string | undefined;
 }
 
 export async function WithClientEnv<TSchema extends EnvSchema>({
   space,
+  nonce,
 }: WithClientEnvProps<TSchema>) {
   await connection();
+  readEnvSpace(space);
   const processEnv = readProcessEnv();
   const rawEnv = Object.fromEntries(
     space.keys.map((key) => [key, processEnv[key]]),
   );
-  return <ClientEnv name={space.name} rawEnv={rawEnv} />;
+  return <ClientEnv name={space.name} rawEnv={rawEnv} nonce={nonce} />;
 }

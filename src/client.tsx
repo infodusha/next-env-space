@@ -8,9 +8,10 @@ import { envSpacesKey, type RawEnv } from "./global.js";
 interface ClientEnvProps {
   readonly name: string;
   readonly rawEnv: RawEnv;
+  readonly nonce?: string | undefined;
 }
 
-export function ClientEnv({ name, rawEnv }: ClientEnvProps) {
+export function ClientEnv({ name, rawEnv, nonce }: ClientEnvProps) {
   const hasFlushed = useRef(false);
 
   useServerInsertedHTML(() => {
@@ -22,6 +23,7 @@ export function ClientEnv({ name, rawEnv }: ClientEnvProps) {
 
     return (
       <script
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: createEnvScript(name, rawEnv) }}
         type="text/javascript"
       />

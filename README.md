@@ -76,6 +76,22 @@ export default function RootLayout({
 }
 ```
 
+### Content Security Policy
+
+The values are shipped in an inline `<script>`, so a policy like `script-src 'nonce-...'`
+blocks it and the space never reaches the browser. Pass the nonce to `WithClientEnv` and it
+goes on the tag:
+
+```tsx
+import { headers } from "next/headers";
+
+const nonce = (await headers()).get("x-nonce") ?? undefined;
+
+<WithClientEnv space={publicEnv} nonce={nonce} />;
+```
+
+Do not reach for `'unsafe-inline'` to make the script run.
+
 ## Read values
 
 ```ts
@@ -137,7 +153,8 @@ The returned space exposes:
 
 ### `next-env-space/server`
 
-- `<WithClientEnv space={space} />` — ships one space to the browser
+- `<WithClientEnv space={space} />` — ships one space to the browser. Takes an optional
+  `nonce` for CSP
 - `getEnvAsync(space, key)` — standalone form of `space.getEnvAsync(key)`, for setups where
   the `react-server` condition cannot be applied
 
@@ -148,6 +165,8 @@ build.
 
 - The whole space is parsed on first read and cached for the lifetime of the process, so a
   bad value fails fast rather than at the call site that happens to need it.
+- `WithClientEnv` parses the space on the server before serialising it, so a missing or
+  malformed value fails there rather than in the browser at the first read.
 - Do not use the `NEXT_PUBLIC_` prefix: those are inlined at build time, which is exactly
   what this package avoids.
 - Values must be `string | undefined` on the way in — use `z.coerce.*`, `z.stringbool()` or

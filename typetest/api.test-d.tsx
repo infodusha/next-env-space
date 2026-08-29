@@ -53,6 +53,11 @@ export function Layout() {
     <>
       <WithClientEnv space={publicEnv} />
       <WithClientEnv space={featureEnv} />
+      <WithClientEnv space={publicEnv} nonce="r4nd0m" />
+      {/* an optional nonce must survive `exactOptionalPropertyTypes` */}
+      <WithClientEnv space={publicEnv} nonce={undefined} />
+      {/* @ts-expect-error nonce must be a string */}
+      <WithClientEnv space={publicEnv} nonce={123} />
       {/* @ts-expect-error space is required */}
       <WithClientEnv />
     </>

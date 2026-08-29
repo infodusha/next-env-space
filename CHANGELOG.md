@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/infodusha/next-env-space/compare/v1.0.1...v1.0.2) (2026-08-29)
+
+
+### Bug Fixes
+
+* ignore CHANGELOG formatting ([02f0522](https://github.com/infodusha/next-env-space/commit/02f0522ed661923ef7357988a1b5a9ae168f27ee))
+
 ## [1.0.1](https://github.com/infodusha/next-env-space/compare/v1.0.0...v1.0.1) (2026-08-29)
 
 

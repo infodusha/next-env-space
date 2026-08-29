@@ -12,6 +12,10 @@
   ],
   "license": "Apache-2.0",
   "author": "infodusha",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/infodusha/next-env-space.git"
+  },
   "files": [
     "dist",
     "README.md",

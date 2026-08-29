@@ -1,4 +1,5 @@
 {
   "printWidth": 80,
-  "sortImports": true
+  "sortImports": true,
+  "ignorePatterns": ["CHANGELOG.md"]
 }

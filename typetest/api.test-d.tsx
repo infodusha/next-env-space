@@ -1,7 +1,10 @@
 import * as z from "zod";
 
-import { createEnvSpace, type InferEnv } from "../src/index.js";
+import { createEnvSpace, type CreateEnvSpace, type InferEnv } from "../src/index.js";
+import { createEnvSpace as createEnvSpaceRsc } from "../src/index.react-server.js";
 import { getEnvAsync, WithClientEnv } from "../src/server.js";
+import type * as ClientEntry from "../src/index.js";
+import type * as ServerEntry from "../src/index.react-server.js";
 
 // 1. plain shape
 const publicEnv = createEnvSpace(
@@ -57,3 +60,21 @@ export function Layout() {
 }
 
 export { appName, gtm, timeout, enterprise, scanners, nodeEnv, all, wrong, server };
+
+// Both entry points must expose exactly the same public type, otherwise the
+// `react-server` condition would change the API depending on the layer.
+
+const sameShape: ClientEntry.CreateEnvSpace = createEnvSpaceRsc;
+const bothWays: ServerEntry.CreateEnvSpace = createEnvSpace as CreateEnvSpace;
+
+// getEnvAsync is now a method on the space itself
+async function methods() {
+  const name: string = await publicEnv.getEnvAsync("APP_NAME");
+  const everything = await featureEnv.getAllEnvAsync();
+  const flag: boolean = everything.FLAG;
+  // @ts-expect-error unknown key
+  await publicEnv.getEnvAsync("NOPE");
+  return [name, flag, sameShape, bothWays] as const;
+}
+
+export { methods };

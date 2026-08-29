@@ -13,6 +13,12 @@ import {
 const defaultSpaceName = "default";
 
 export interface EnvSpaceOptions {
+  /**
+   * Unique name of the space. Used as the key the raw values are published
+   * under on the client, so every space in an app needs its own name.
+   *
+   * @default "default"
+   */
   readonly name?: string;
 }
 
@@ -20,69 +26,108 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
   readonly name: string;
   readonly keys: readonly (keyof TSchema & string)[];
   readonly schema: TSchema;
+  /**
+   * Reads a single variable. Safe at module scope, in client components and in
+   * server code that already opted out of prerendering. Throws when called
+   * while a Server Component renders — use `getEnvAsync` there.
+   */
   getEnv<TKey extends keyof TSchema>(key: TKey): InferEnv<TSchema>[TKey];
+  /** Reads the whole space at once, with the same rules as `getEnv`. */
   getAllEnv(): InferEnv<TSchema>;
+  /**
+   * Reads a single variable inside a Server Component. Opts the render out of
+   * prerendering first, so the value is always the one of the running server.
+   */
+  getEnvAsync<TKey extends keyof TSchema>(
+    key: TKey,
+  ): Promise<InferEnv<TSchema>[TKey]>;
+  /** Reads the whole space at once, with the same rules as `getEnvAsync`. */
+  getAllEnvAsync(): Promise<InferEnv<TSchema>>;
+}
+
+export interface CreateEnvSpace {
+  <TSchema extends EnvSchema>(
+    schema: TSchema,
+    options?: EnvSpaceOptions,
+  ): EnvSpace<TSchema>;
+  <TSchema extends EnvSchema>(
+    schema: z.ZodObject<TSchema>,
+    options?: EnvSpaceOptions,
+  ): EnvSpace<TSchema>;
+}
+
+export interface EnvRuntime {
+  readonly connection: () => Promise<void>;
+  readonly isReactServer: boolean;
 }
 
 const takenNames = new Set<string>();
 
-export function createEnvSpace<TSchema extends EnvSchema>(
-  schema: TSchema,
-  options?: EnvSpaceOptions,
-): EnvSpace<TSchema>;
-export function createEnvSpace<TSchema extends EnvSchema>(
-  schema: z.ZodObject<TSchema>,
-  options?: EnvSpaceOptions,
-): EnvSpace<TSchema>;
-export function createEnvSpace<TSchema extends EnvSchema>(
-  schema: EnvSchemaInput<TSchema>,
-  options: EnvSpaceOptions = {},
-): EnvSpace<TSchema> {
-  const shape = toEnvShape(schema);
-  const name = options.name ?? defaultSpaceName;
-  const keys = Object.keys(shape) as (keyof TSchema & string)[];
-
-  if (takenNames.has(name)) {
-    console.warn(
-      `Env space "${name}" is created more than once. ` +
-        `Pass a unique "name" option to createEnvSpace() so the spaces do not overwrite each other on the client.`,
-    );
-  }
-  takenNames.add(name);
-
-  let cachedEnv: InferEnv<TSchema> | null = null;
-
-  function getAllEnv(): InferEnv<TSchema> {
-    assertNotInRender(name, "getAllEnv()");
-    return readAllEnv();
-  }
-
-  function readAllEnv(): InferEnv<TSchema> {
-    cachedEnv ??= parseEnv(shape, readRawEnv(name));
-    return cachedEnv;
-  }
-
-  function getEnv<TKey extends keyof TSchema>(
-    key: TKey,
-  ): InferEnv<TSchema>[TKey] {
-    assertNotInRender(name, `getEnv('${String(key)}')`);
-    return readAllEnv()[key];
-  }
-
-  const space: EnvSpace<TSchema> = {
-    name,
-    keys,
-    schema: shape,
-    getEnv,
-    getAllEnv,
-  };
-
-  readers.set(space, readAllEnv);
-
-  return space;
-}
-
 const readers = new WeakMap<object, () => unknown>();
+
+export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
+  return function createEnvSpace<TSchema extends EnvSchema>(
+    schema: EnvSchemaInput<TSchema>,
+    options: EnvSpaceOptions = {},
+  ): EnvSpace<TSchema> {
+    const shape = toEnvShape(schema);
+    const name = options.name ?? defaultSpaceName;
+    const keys = Object.keys(shape) as (keyof TSchema & string)[];
+
+    if (takenNames.has(name)) {
+      console.warn(
+        `Env space "${name}" is created more than once. ` +
+          `Pass a unique "name" option to createEnvSpace() so the spaces do not overwrite each other on the client.`,
+      );
+    }
+    takenNames.add(name);
+
+    let cachedEnv: InferEnv<TSchema> | null = null;
+
+    function readAllEnv(): InferEnv<TSchema> {
+      cachedEnv ??= parseEnv(shape, readRawEnv(name));
+      return cachedEnv;
+    }
+
+    function getAllEnv(): InferEnv<TSchema> {
+      assertNotInRender(name, "getAllEnv()");
+      return readAllEnv();
+    }
+
+    function getEnv<TKey extends keyof TSchema>(
+      key: TKey,
+    ): InferEnv<TSchema>[TKey] {
+      assertNotInRender(name, `getEnv('${String(key)}')`);
+      return readAllEnv()[key];
+    }
+
+    async function getAllEnvAsync(): Promise<InferEnv<TSchema>> {
+      await runtime.connection();
+      assertConnected(runtime, name);
+      return readAllEnv();
+    }
+
+    async function getEnvAsync<TKey extends keyof TSchema>(
+      key: TKey,
+    ): Promise<InferEnv<TSchema>[TKey]> {
+      return (await getAllEnvAsync())[key];
+    }
+
+    const space: EnvSpace<TSchema> = {
+      name,
+      keys,
+      schema: shape,
+      getEnv,
+      getAllEnv,
+      getEnvAsync,
+      getAllEnvAsync,
+    };
+
+    readers.set(space, readAllEnv);
+
+    return space;
+  };
+}
 
 export function readEnvSpace<TSchema extends EnvSchema>(
   space: EnvSpace<TSchema>,
@@ -111,17 +156,31 @@ function readRawEnv(name: string): RawEnv {
   return rawEnv;
 }
 
-function assertNotInRender(name: string, call: string): void {
-  if (typeof window !== "undefined") {
-    return;
-  }
+function isServerRender(): boolean {
+  return (
+    typeof react.cacheSignal === "function" && react.cacheSignal() !== null
+  );
+}
 
-  if (typeof react.cacheSignal !== "function" || react.cacheSignal() === null) {
+function assertNotInRender(name: string, call: string): void {
+  if (typeof window !== "undefined" || !isServerRender()) {
     return;
   }
 
   throw new Error(
     `${call} of the "${name}" env space is called while rendering, so its value can be captured at build time. ` +
-      `Use getEnvAsync(space, key) from "next-env-space/server" instead, or read it at module scope.`,
+      `Use getEnvAsync() instead, or read it at module scope.`,
+  );
+}
+
+function assertConnected(runtime: EnvRuntime, name: string): void {
+  if (runtime.isReactServer || !isServerRender()) {
+    return;
+  }
+
+  throw new Error(
+    `getEnvAsync() of the "${name}" env space could not opt the render out of prerendering: ` +
+      `"next-env-space" was resolved without the "react-server" export condition. ` +
+      `Remove it from serverExternalPackages, or use getEnvAsync(space, key) from "next-env-space/server".`,
   );
 }

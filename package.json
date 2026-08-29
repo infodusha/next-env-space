@@ -18,6 +18,10 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "react-server": {
+        "types": "./dist/index.react-server.d.ts",
+        "default": "./dist/index.react-server.js"
+      },
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },

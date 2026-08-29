@@ -1,8 +1,10 @@
+import { connection } from "next/server";
+
 import { createEnvSpaceWith, type CreateEnvSpace } from "./space.js";
 
 export * from "./types.js";
 
 export const createEnvSpace: CreateEnvSpace = createEnvSpaceWith({
-  connection: async () => {},
-  isReactServer: false,
+  connection,
+  isReactServer: true,
 });

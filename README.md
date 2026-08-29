@@ -87,19 +87,25 @@ const timeout = publicEnv.getEnv("INACTIVE_TIMEOUT_SECONDS"); // number
 ```
 
 Inside a Server Component the value would be baked into the prerender, so `getEnv` throws
-there. Use `getEnvAsync` instead — it calls `connection()` first, which opts the route out
-of prerendering:
+there. Use `getEnvAsync` — it calls `connection()` first, which opts the route out of
+prerendering:
 
 ```tsx
-import { getEnvAsync } from "next-env-space/server";
-
 import { publicEnv } from "@/env";
 
 export default async function Page() {
-  const appName = await getEnvAsync(publicEnv, "APP_NAME");
+  const appName = await publicEnv.getEnvAsync("APP_NAME");
   return <h1>{appName}</h1>;
 }
 ```
+
+`getEnvAsync` lives on the space itself, in the isomorphic entry point, even though
+`connection()` only exists on the server. That works through the `react-server` export
+condition: the RSC layer resolves `next-env-space` to a build that awaits the real
+`connection()`, every other layer gets one that awaits nothing — and never pulls
+`next/server` into the browser bundle. If the condition is ever missed (for example the
+package is listed in `serverExternalPackages`), `getEnvAsync` throws instead of quietly
+leaving the render prerenderable.
 
 ## Several spaces
 
@@ -125,14 +131,15 @@ with its own type, so a missing or malformed variable names itself in the error.
 
 The returned space exposes:
 
-- `getEnv(key)` — one parsed value
-- `getAllEnv()` — the whole parsed space
+- `getEnv(key)` / `getAllEnv()` — synchronous, outside a Server Component render
+- `getEnvAsync(key)` / `getAllEnvAsync()` — inside a Server Component, awaits `connection()`
 - `name`, `keys`, `schema`
 
 ### `next-env-space/server`
 
-- `getEnvAsync(space, key)` — `getEnv` for Server Components, awaits `connection()` first
 - `<WithClientEnv space={space} />` — ships one space to the browser
+- `getEnvAsync(space, key)` — standalone form of `space.getEnvAsync(key)`, for setups where
+  the `react-server` condition cannot be applied
 
 This entry point is marked `server-only`; importing it from a client component fails the
 build.

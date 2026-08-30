@@ -1,13 +1,13 @@
 import "server-only";
 import type { ReactNode } from "react";
 
-import { ClientEnv, ClientEnvProvider } from "./client.js";
+import { EnvScript, EnvProvider } from "./client.js";
 import { optOutOfPrerender } from "./dynamic.js";
 import type { RawEnv } from "./global.js";
 import type { EnvSchema } from "./schema.js";
 import { readEnvSpace, type EnvSpace } from "./space.js";
 
-export interface WithClientEnvProps<TSchema extends EnvSchema> {
+export interface ClientEnvScriptProps<TSchema extends EnvSchema> {
   /** The env space to ship, created by `createEnvSpace()`. */
   readonly space: EnvSpace<TSchema>;
   /** Put on the inline `<script>` tag, for a `script-src 'nonce-...'` CSP. */
@@ -23,15 +23,15 @@ export interface WithClientEnvProps<TSchema extends EnvSchema> {
  * Render it once per space, in a layout above the client components that read
  * the space. Serves every read, the synchronous `get()` included.
  */
-export async function WithClientEnv<TSchema extends EnvSchema>({
+export async function ClientEnvScript<TSchema extends EnvSchema>({
   space,
   nonce,
-}: WithClientEnvProps<TSchema>) {
+}: ClientEnvScriptProps<TSchema>) {
   const rawEnv = await readRawValues(space);
-  return <ClientEnv name={space.name} rawEnv={rawEnv} nonce={nonce} />;
+  return <EnvScript name={space.name} rawEnv={rawEnv} nonce={nonce} />;
 }
 
-export interface UseClientEnvProps<TSchema extends EnvSchema> {
+export interface ClientEnvProviderProps<TSchema extends EnvSchema> {
   /** The env space to ship, created by `createEnvSpace()`. */
   readonly space: EnvSpace<TSchema>;
   readonly children?: ReactNode;
@@ -46,15 +46,15 @@ export interface UseClientEnvProps<TSchema extends EnvSchema> {
  * Wrap it around the tree that reads the space; a second space nests inside
  * the first. Everything in the space still becomes public.
  */
-export async function UseClientEnv<TSchema extends EnvSchema>({
+export async function ClientEnvProvider<TSchema extends EnvSchema>({
   space,
   children,
-}: UseClientEnvProps<TSchema>) {
+}: ClientEnvProviderProps<TSchema>) {
   const rawEnv = await readRawValues(space);
   return (
-    <ClientEnvProvider name={space.name} rawEnv={rawEnv}>
+    <EnvProvider name={space.name} rawEnv={rawEnv}>
       {children}
-    </ClientEnvProvider>
+    </EnvProvider>
   );
 }
 

@@ -10,7 +10,7 @@ import {
 import type * as ClientEntry from "../src/index.js";
 import { createEnvSpace as createEnvSpaceRsc } from "../src/index.react-server.js";
 import type * as ServerEntry from "../src/index.react-server.js";
-import { UseClientEnv, WithClientEnv } from "../src/server.js";
+import { ClientEnvProvider, ClientEnvScript } from "../src/server.js";
 
 // 1. zod
 const publicEnv = createEnvSpace(
@@ -106,30 +106,30 @@ const handRolled = {
 export function Layout() {
   return (
     <>
-      <WithClientEnv space={publicEnv} />
+      <ClientEnvScript space={publicEnv} />
       {/* @ts-expect-error only createEnvSpace() produces an env space */}
-      <WithClientEnv space={handRolled} />
+      <ClientEnvScript space={handRolled} />
       {/* @ts-expect-error the same brand guards the context provider */}
-      <UseClientEnv space={handRolled} />
-      <WithClientEnv space={featureEnv} />
-      <WithClientEnv space={mixedEnv} />
-      <WithClientEnv space={publicEnv} nonce="r4nd0m" />
+      <ClientEnvProvider space={handRolled} />
+      <ClientEnvScript space={featureEnv} />
+      <ClientEnvScript space={mixedEnv} />
+      <ClientEnvScript space={publicEnv} nonce="r4nd0m" />
       {/* an optional nonce must survive `exactOptionalPropertyTypes` */}
-      <WithClientEnv space={publicEnv} nonce={undefined} />
+      <ClientEnvScript space={publicEnv} nonce={undefined} />
       {/* @ts-expect-error nonce must be a string */}
-      <WithClientEnv space={publicEnv} nonce={123} />
+      <ClientEnvScript space={publicEnv} nonce={123} />
       {/* @ts-expect-error space is required */}
-      <WithClientEnv />
+      <ClientEnvScript />
 
-      <UseClientEnv space={publicEnv}>
+      <ClientEnvProvider space={publicEnv}>
         <span />
-      </UseClientEnv>
+      </ClientEnvProvider>
       {/* children are optional, the same way a layout may render none */}
-      <UseClientEnv space={featureEnv} />
+      <ClientEnvProvider space={featureEnv} />
       {/* @ts-expect-error the context provider takes no nonce */}
-      <UseClientEnv space={publicEnv} nonce="r4nd0m" />
+      <ClientEnvProvider space={publicEnv} nonce="r4nd0m" />
       {/* @ts-expect-error space is required */}
-      <UseClientEnv>{null}</UseClientEnv>
+      <ClientEnvProvider>{null}</ClientEnvProvider>
     </>
   );
 }

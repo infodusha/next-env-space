@@ -144,7 +144,7 @@ test("a space that was never shipped fails loudly in the browser", async ({
   await expect(page.getByTestId("message")).toContainText(
     'Env space "unpublished" is missing on the client.',
   );
-  await expect(page.getByTestId("message")).toContainText("<WithClientEnv");
+  await expect(page.getByTestId("message")).toContainText("<ClientEnvScript");
 });
 
 // The server render still answers from `process.env`, so the throw happens in

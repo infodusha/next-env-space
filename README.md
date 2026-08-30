@@ -100,20 +100,20 @@ async refinement throws on its first read.
 
 ## Send a space to the browser
 
-Render `WithClientEnv` once per space, in a layout above the client components that read it.
+Render `ClientEnvScript` once per space, in a layout above the client components that read it.
 It serialises the raw values into a `<script>` tag, so **everything in that space becomes
 public**. Keep secrets in a separate space that is never rendered.
 
 It has to sit **above** the components that read it, not merely before them: a layout that a
 client-side navigation mounts has no document left to write a script into, and the values
-reach the browser as `WithClientEnv` itself renders there.
+reach the browser as `ClientEnvScript` itself renders there.
 
-There is a second publisher, `UseClientEnv`, that carries the space in React context instead
+There is a second publisher, `ClientEnvProvider`, that carries the space in React context instead
 of a script — [see below](#without-the-inline-script) for what that trades away.
 
 ```tsx
 // app/layout.tsx
-import { WithClientEnv } from "next-env-space/server";
+import { ClientEnvScript } from "next-env-space/server";
 
 import { publicEnv } from "@/env";
 
@@ -125,7 +125,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <WithClientEnv space={publicEnv} />
+        <ClientEnvScript space={publicEnv} />
         {children}
       </body>
     </html>
@@ -136,7 +136,7 @@ export default function RootLayout({
 ### Content Security Policy
 
 The values are shipped in an inline `<script>`, so a policy like `script-src 'nonce-...'`
-blocks it and the space never reaches the browser. Pass the nonce to `WithClientEnv` and it
+blocks it and the space never reaches the browser. Pass the nonce to `ClientEnvScript` and it
 goes on the tag:
 
 ```tsx
@@ -144,7 +144,7 @@ import { headers } from "next/headers";
 
 const nonce = (await headers()).get("x-nonce") ?? undefined;
 
-<WithClientEnv space={publicEnv} nonce={nonce} />;
+<ClientEnvScript space={publicEnv} nonce={nonce} />;
 ```
 
 Do not reach for `'unsafe-inline'` to make the script run.
@@ -154,19 +154,19 @@ not combine with `cacheComponents`: the static shell is built before any
 request, so Next bakes its own bootstrap scripts into it without a nonce and
 the browser blocks them — a
 [Next limitation](https://nextjs.org/docs/app/guides/content-security-policy),
-not something `WithClientEnv` can route around. The env script itself streams
+not something `ClientEnvScript` can route around. The env script itself streams
 with the nonce of the request either way. Under `cacheComponents`, prefer a
-hash-based policy or `UseClientEnv`.
+hash-based policy or `ClientEnvProvider`.
 
 ### Without the inline script
 
-`UseClientEnv` publishes the same space through React context instead. Nothing is written
+`ClientEnvProvider` publishes the same space through React context instead. Nothing is written
 into the document, so there is no nonce to pass and no `script-src` to widen — but it wraps
 the tree rather than sitting next to it:
 
 ```tsx
 // app/layout.tsx
-import { UseClientEnv } from "next-env-space/server";
+import { ClientEnvProvider } from "next-env-space/server";
 
 import { publicEnv } from "@/env";
 
@@ -178,7 +178,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <UseClientEnv space={publicEnv}>{children}</UseClientEnv>
+        <ClientEnvProvider space={publicEnv}>{children}</ClientEnvProvider>
       </body>
     </html>
   );
@@ -188,13 +188,13 @@ export default function RootLayout({
 Providers nest, so a second space wraps the first:
 
 ```tsx
-<UseClientEnv space={publicEnv}>
-  <UseClientEnv space={featureEnv}>{children}</UseClientEnv>
-</UseClientEnv>
+<ClientEnvProvider space={publicEnv}>
+  <ClientEnvProvider space={featureEnv}>{children}</ClientEnvProvider>
+</ClientEnvProvider>
 ```
 
 What it costs is every read that does not happen while a component renders — context is
-only readable from a render. With `UseClientEnv` alone:
+only readable from a render. With `ClientEnvProvider` alone:
 
 - `get()` and `getAll()` throw in the browser; they never look at the context
 - `getAsync()` and `getAllAsync()` work inside a client component, and throw from an event
@@ -240,30 +240,30 @@ export function AppName() {
 }
 ```
 
-This is the only read `<UseClientEnv />` on its own can serve. Everything else in this
-section needs the space published with `<WithClientEnv />`.
+This is the only read `<ClientEnvProvider />` on its own can serve. Everything else in this
+section needs the space published with `<ClientEnvScript />`.
 
 ### Where each read works
 
-| where                                                  | `get()`                            | `getAsync()`                                                    |
-| ------------------------------------------------------ | ---------------------------------- | --------------------------------------------------------------- |
-| Server Component render, `generateMetadata`            | throws                             | works, opts the route out of prerendering                       |
-| Client Component render                                | works                              | works, unwrapped with `use()`                                   |
-| Client Component, outside the render (handler, effect) | works                              | works with `<WithClientEnv />`; throws with `<UseClientEnv />`  |
-| module scope of a client module                        | works                              | works with `<WithClientEnv />`; throws with `<UseClientEnv />`  |
-| module scope of a server module                        | works, runtime value               | do not `await` at module scope                                  |
-| Route Handler                                          | works                              | works                                                           |
-| Route Handler with `dynamic = "force-static"`          | **build-time value**, silently     | **build-time value**, silently                                  |
-| Server Action                                          | works                              | works                                                           |
-| `proxy.ts` (middleware)                                | works                              | works                                                           |
-| `instrumentation.ts` — `register()`                    | works                              | throws: Next has no request to attach to                        |
-| `instrumentation-client.ts`                            | works below `<WithClientEnv />`    | works below `<WithClientEnv />`; throws with `<UseClientEnv />` |
-| `generateStaticParams`                                 | build-time value — that is its job | throws: Next has no request to attach to                        |
-| inside a `"use cache"` function                        | throws                             | **build-time value**, cached                                    |
+| where                                                  | `get()`                            | `getAsync()`                                                           |
+| ------------------------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------- |
+| Server Component render, `generateMetadata`            | throws                             | works, opts the route out of prerendering                              |
+| Client Component render                                | works                              | works, unwrapped with `use()`                                          |
+| Client Component, outside the render (handler, effect) | works                              | works with `<ClientEnvScript />`; throws with `<ClientEnvProvider />`  |
+| module scope of a client module                        | works                              | works with `<ClientEnvScript />`; throws with `<ClientEnvProvider />`  |
+| module scope of a server module                        | works, runtime value               | do not `await` at module scope                                         |
+| Route Handler                                          | works                              | works                                                                  |
+| Route Handler with `dynamic = "force-static"`          | **build-time value**, silently     | **build-time value**, silently                                         |
+| Server Action                                          | works                              | works                                                                  |
+| `proxy.ts` (middleware)                                | works                              | works                                                                  |
+| `instrumentation.ts` — `register()`                    | works                              | throws: Next has no request to attach to                               |
+| `instrumentation-client.ts`                            | works below `<ClientEnvScript />`  | works below `<ClientEnvScript />`; throws with `<ClientEnvProvider />` |
+| `generateStaticParams`                                 | build-time value — that is its job | throws: Next has no request to attach to                               |
+| inside a `"use cache"` function                        | throws                             | **build-time value**, cached                                           |
 
 `instrumentation-client.ts` runs once, as the first page loads, before any component: it
-sees a space only if that page writes the env script of `<WithClientEnv />` — a root layout
-does — and never the context of `<UseClientEnv />`, which has not rendered yet.
+sees a space only if that page writes the env script of `<ClientEnvScript />` — a root layout
+does — and never the context of `<ClientEnvProvider />`, which has not rendered yet.
 
 The two bold rows are the ones no guard can catch. A `force-static` Route Handler is
 prerendered once at build, and `"use cache"` caches whatever its body returned the first
@@ -273,20 +273,20 @@ static mode for that route.
 
 ## Cache Components
 
-With `cacheComponents` on, `getAsync`, `<WithClientEnv />` and `<UseClientEnv />` all become
+With `cacheComponents` on, `getAsync`, `<ClientEnvScript />` and `<ClientEnvProvider />` all become
 dynamic holes and need a `<Suspense>` boundary around them:
 
 ```tsx
 <body>
   <Suspense fallback={null}>
-    <WithClientEnv space={publicEnv} />
+    <ClientEnvScript space={publicEnv} />
     {children}
   </Suspense>
 </body>
 ```
 
 Put that boundary **above everything that reads the space**, not tightly around
-`WithClientEnv` — the readers have to be inside it too. Whatever stays outside belongs to
+`ClientEnvScript` — the readers have to be inside it too. Whatever stays outside belongs to
 the static shell and is rendered during `next build`, where a read still answers, with the
 build machine's value: it then sits in the prerendered HTML and mismatches the runtime value
 on hydration.
@@ -302,14 +302,14 @@ rendering that value into the static shell that captures it.
 
 Every space needs its own `name` — it is the key the values are published under on the
 client. Spaces are independent: each has its own schema, its own cache and its own
-`WithClientEnv`, so a second public space is rendered next to the first:
+`ClientEnvScript`, so a second public space is rendered next to the first:
 
 ```tsx
-<WithClientEnv space={publicEnv} />
-<WithClientEnv space={featureEnv} />
+<ClientEnvScript space={publicEnv} />
+<ClientEnvScript space={featureEnv} />
 ```
 
-`<UseClientEnv />` nests instead of repeating, and merges with the provider above it.
+`<ClientEnvProvider />` nests instead of repeating, and merges with the provider above it.
 
 ## Recipes
 
@@ -349,7 +349,7 @@ The space caches its parsed values for the lifetime of the process and reads `pr
 when a module first touches it. In a unit test, set the variables first and import the module
 under test afterwards — `vi.resetModules()` between cases gives every set of values a fresh
 space. Under a browser-like environment (`jsdom`, `happy-dom`) `window` exists, so the space
-looks for the values `<WithClientEnv />` publishes and finds none: run the tests of
+looks for the values `<ClientEnvScript />` publishes and finds none: run the tests of
 server-side code in the `node` environment.
 
 ## API
@@ -387,11 +387,11 @@ The shape itself works as well — `InferEnv<typeof publicEnv.schema>` names the
 
 ### `next-env-space/server`
 
-- `<WithClientEnv space={space} />` — ships one space to the browser in an inline
+- `<ClientEnvScript space={space} />` — ships one space to the browser in an inline
   `<script>`, before any client module is evaluated, or from the browser itself when a
   client-side navigation is what mounts it. Takes an optional `nonce` for CSP. Serves every
   read, `get()` included
-- `<UseClientEnv space={space}>{children}</UseClientEnv>` — ships the same space through
+- `<ClientEnvProvider space={space}>{children}</ClientEnvProvider>` — ships the same space through
   React context. No inline script and no nonce, but only `getAsync()` / `getAllAsync()`
   can read it, and only from a component below it
 
@@ -408,7 +408,7 @@ build.
 - Two spaces under one `name` overwrite each other on the client. That is harmless while
   they declare the same keys — a hot reload re-creates a space this way — and an error as
   soon as they do not: a warning in development, a thrown error in production.
-- `WithClientEnv` parses the space on the server before serialising it, so a missing or
+- `ClientEnvScript` parses the space on the server before serialising it, so a missing or
   malformed value fails there rather than in the browser at the first read.
 - Do not use the `NEXT_PUBLIC_` prefix: those are inlined at build time, which is exactly
   what this package avoids.

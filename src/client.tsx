@@ -8,13 +8,13 @@ import { envSpacesKey, type RawEnv } from "./global.js";
 
 const EnvContext = envContext();
 
-interface ClientEnvProps {
+interface EnvScriptProps {
   readonly name: string;
   readonly rawEnv: RawEnv;
   readonly nonce?: string | undefined;
 }
 
-export function ClientEnv({ name, rawEnv, nonce }: ClientEnvProps) {
+export function EnvScript({ name, rawEnv, nonce }: EnvScriptProps) {
   const hasFlushed = useRef(false);
 
   publishToWindow(name, rawEnv);
@@ -38,17 +38,13 @@ export function ClientEnv({ name, rawEnv, nonce }: ClientEnvProps) {
   return null;
 }
 
-interface ClientEnvProviderProps {
+interface EnvProviderProps {
   readonly name: string;
   readonly rawEnv: RawEnv;
   readonly children?: ReactNode;
 }
 
-export function ClientEnvProvider({
-  name,
-  rawEnv,
-  children,
-}: ClientEnvProviderProps) {
+export function EnvProvider({ name, rawEnv, children }: EnvProviderProps) {
   const outer = useContext(EnvContext);
   const spaces = useMemo(
     () => ({ ...outer, [name]: rawEnv }),

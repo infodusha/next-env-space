@@ -100,7 +100,7 @@ test.describe("instrumentation-client.ts", () => {
   const missingMessage = 'Env space "public" is missing on the client';
   const outsideRenderMessage = "was called outside of a render";
 
-  test("both reads work on a page that renders <WithClientEnv />", async ({
+  test("both reads work on a page that renders <ClientEnvScript />", async ({
     page,
   }) => {
     expect(await readsOn(page, "/")).toEqual({
@@ -118,7 +118,7 @@ test.describe("instrumentation-client.ts", () => {
     expect(reads?.async).toContain(outsideRenderMessage);
   });
 
-  test("both throw below <UseClientEnv />, which runs after it", async ({
+  test("both throw below <ClientEnvProvider />, which runs after it", async ({
     page,
   }) => {
     const reads = await readsOn(page, "/provided");

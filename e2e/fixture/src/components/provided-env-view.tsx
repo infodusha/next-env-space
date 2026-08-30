@@ -5,7 +5,7 @@ import { use } from "react";
 import { providedEnv, providedNestedEnv } from "@/env";
 
 /**
- * Reads two spaces that reached the browser through `<UseClientEnv />` context —
+ * Reads two spaces that reached the browser through `<ClientEnvProvider />` context —
  * there is no `__ENV_SPACES__` script on this page at all. The outer space is
  * read from below the inner provider, so a provider that replaced its parent
  * instead of merging would fail here.

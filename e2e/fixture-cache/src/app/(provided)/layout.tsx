@@ -1,4 +1,4 @@
-import { UseClientEnv } from "next-env-space/server";
+import { ClientEnvProvider } from "next-env-space/server";
 import { Suspense, type ReactNode } from "react";
 
 import { providedEnv, providedNestedEnv } from "@/env";
@@ -11,9 +11,11 @@ import { providedEnv, providedNestedEnv } from "@/env";
 export default function ProvidedLayout({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={null}>
-      <UseClientEnv space={providedEnv}>
-        <UseClientEnv space={providedNestedEnv}>{children}</UseClientEnv>
-      </UseClientEnv>
+      <ClientEnvProvider space={providedEnv}>
+        <ClientEnvProvider space={providedNestedEnv}>
+          {children}
+        </ClientEnvProvider>
+      </ClientEnvProvider>
     </Suspense>
   );
 }

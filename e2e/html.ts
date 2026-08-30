@@ -1,4 +1,4 @@
-/** The script `<WithClientEnv />` writes into the document. */
+/** The script `<ClientEnvScript />` writes into the document. */
 const envScript =
   /<script(?<attributes>[^>]*)>window\["__ENV_SPACES__"\]=Object\.assign\(window\["__ENV_SPACES__"\]\|\|[{][}],(?<payload>.*?)\);<\/script>/gsu;
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 /**
  * Outside the `(published)` layout, so the link below mounts that layout —
- * and the `<WithClientEnv />` in it — in the browser, where nothing can be
+ * and the `<ClientEnvScript />` in it — in the browser, where nothing can be
  * inserted into the document any more.
  */
 export default function SoftNavPage() {

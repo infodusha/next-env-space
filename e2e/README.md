@@ -61,17 +61,17 @@ would silently test the build before it.
 | `/api/env`              | `get()` and `getAsync()` in a Route Handler               |
 | `/api/broken`           | a value the schema rejects                                |
 | `/api/broken-pair`      | two bad values, reported in one error                     |
-| `/provided`             | a space carried by `<UseClientEnv />` context alone       |
+| `/provided`             | a space carried by `<ClientEnvProvider />` context alone  |
 | `/provided-late`        | the same space read after the render, which has to fail   |
 | `/soft-nav`             | a client-side navigation into the layouts that publish    |
 | `/guards`               | every misuse the API rejects, and how it words it         |
 | `/contexts/*`           | the rows of the README table "Where each read works"      |
 
-The routes under `(published)` sit below a layout that renders `<WithClientEnv />`;
+The routes under `(published)` sit below a layout that renders `<ClientEnvScript />`;
 the ones under `(bare)` do not, which is what lets `/render-guard` be prerendered
 at build time, `/async-env` prove that the prerender opt-out really ran, and
 `/soft-nav` reach that layout for the first time from the browser. The ones under
-`(provided)` sit below two nested `<UseClientEnv />` instead, so no inline script
+`(provided)` sit below two nested `<ClientEnvProvider />` instead, so no inline script
 reaches them at all.
 
 `/contexts/*` and `/api/contexts/*` each put both reads into one context of the

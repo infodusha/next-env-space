@@ -1,4 +1,4 @@
-import { UseClientEnv } from "next-env-space/server";
+import { ClientEnvProvider } from "next-env-space/server";
 
 import { providedEnv, providedNestedEnv } from "@/env";
 
@@ -12,8 +12,10 @@ export default function ProvidedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <UseClientEnv space={providedEnv}>
-      <UseClientEnv space={providedNestedEnv}>{children}</UseClientEnv>
-    </UseClientEnv>
+    <ClientEnvProvider space={providedEnv}>
+      <ClientEnvProvider space={providedNestedEnv}>
+        {children}
+      </ClientEnvProvider>
+    </ClientEnvProvider>
   );
 }

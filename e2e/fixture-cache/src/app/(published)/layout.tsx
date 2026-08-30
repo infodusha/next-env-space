@@ -1,4 +1,4 @@
-import { WithClientEnv } from "next-env-space/server";
+import { ClientEnvScript } from "next-env-space/server";
 import { Suspense, type ReactNode } from "react";
 
 import { publicEnv } from "@/env";
@@ -11,7 +11,7 @@ import { publicEnv } from "@/env";
 export default function PublishedLayout({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={null}>
-      <WithClientEnv space={publicEnv} />
+      <ClientEnvScript space={publicEnv} />
       {children}
     </Suspense>
   );

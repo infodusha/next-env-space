@@ -101,8 +101,10 @@ test.describe("a space that only context carries", () => {
     await expect(page.getByTestId("message")).toContainText(
       'Env space "provided-nested" is missing on the client.',
     );
-    await expect(page.getByTestId("message")).toContainText("<WithClientEnv");
-    await expect(page.getByTestId("message")).toContainText("<UseClientEnv");
+    await expect(page.getByTestId("message")).toContainText("<ClientEnvScript");
+    await expect(page.getByTestId("message")).toContainText(
+      "<ClientEnvProvider",
+    );
   });
 
   test("says so when getAsync() runs outside a render", async ({ page }) => {
@@ -112,6 +114,6 @@ test.describe("a space that only context carries", () => {
     await expect(page.getByTestId("message")).toContainText(
       "was called outside of a render",
     );
-    await expect(page.getByTestId("message")).toContainText("<WithClientEnv");
+    await expect(page.getByTestId("message")).toContainText("<ClientEnvScript");
   });
 });

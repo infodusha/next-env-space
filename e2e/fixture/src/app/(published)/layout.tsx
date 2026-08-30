@@ -1,4 +1,4 @@
-import { WithClientEnv } from "next-env-space/server";
+import { ClientEnvScript } from "next-env-space/server";
 import { headers } from "next/headers";
 
 import { featureEnv, publicEnv } from "@/env";
@@ -14,8 +14,8 @@ export default async function PublishedLayout({
 
   return (
     <>
-      <WithClientEnv space={publicEnv} nonce={nonce} />
-      <WithClientEnv space={featureEnv} nonce={nonce} />
+      <ClientEnvScript space={publicEnv} nonce={nonce} />
+      <ClientEnvScript space={featureEnv} nonce={nonce} />
       {children}
     </>
   );

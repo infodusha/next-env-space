@@ -27,7 +27,7 @@ export function readRawEnv(
 
   throw new Error(
     `Env space "${name}" is missing on the client. ` +
-      `Render <WithClientEnv space={...} /> or <UseClientEnv space={...}> from ` +
+      `Render <ClientEnvScript space={...} /> or <ClientEnvProvider space={...}> from ` +
       `"next-env-space/server" above the components that read it.`,
   );
 }
@@ -46,8 +46,8 @@ function readProvidedEnv(
   } catch {
     throw new Error(
       `getAsync() of the "${name}" env space was called outside of a render, ` +
-        `where the <UseClientEnv> context cannot be read. Publish the space with ` +
-        `<WithClientEnv space={...} /> instead — it lands before any component runs.`,
+        `where the <ClientEnvProvider> context cannot be read. Publish the space with ` +
+        `<ClientEnvScript space={...} /> instead — it lands before any component runs.`,
     );
   }
 }

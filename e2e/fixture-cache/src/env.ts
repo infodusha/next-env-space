@@ -15,7 +15,7 @@ export const publicEnv = createEnvSpace(
   { name: "public" },
 );
 
-/** Carried by `<UseClientEnv />` context only — never written into the document. */
+/** Carried by `<ClientEnvProvider />` context only — never written into the document. */
 export const providedEnv = createEnvSpace(
   {
     PROVIDED_LABEL: z.string(),
@@ -24,7 +24,7 @@ export const providedEnv = createEnvSpace(
   { name: "provided" },
 );
 
-/** Provided by a second, nested `<UseClientEnv />` — it has to merge, not replace. */
+/** Provided by a second, nested `<ClientEnvProvider />` — it has to merge, not replace. */
 export const providedNestedEnv = createEnvSpace(
   {
     PROVIDED_NESTED: z.string(),

@@ -103,8 +103,7 @@ const timeout = publicEnv.getEnv("REQUEST_TIMEOUT_SECONDS"); // number
 ```
 
 Inside a Server Component the value would be baked into the prerender, so `getEnv` throws
-there. Use `getEnvAsync` — it calls `connection()` first, which opts the route out of
-prerendering:
+there. Use `getEnvAsync` — it opts the render out of prerendering first:
 
 ```tsx
 import { publicEnv } from "@/env";
@@ -115,13 +114,47 @@ export default async function Page() {
 }
 ```
 
-`getEnvAsync` lives on the space itself, in the isomorphic entry point, even though
-`connection()` only exists on the server. That works through the `react-server` export
-condition: the RSC layer resolves `next-env-space` to a build that awaits the real
-`connection()`, every other layer gets one that awaits nothing — and never pulls
-`next/server` into the browser bundle. If the condition is ever missed (for example the
-package is listed in `serverExternalPackages`), `getEnvAsync` throws instead of quietly
-leaving the render prerenderable.
+`getEnvAsync` lives on the space itself, in the isomorphic entry point, even though the API
+it calls only exists on the server. That works through the `react-server` export condition:
+the RSC layer resolves `next-env-space` to a build that awaits the real Next API, every
+other layer gets one that awaits nothing — and never pulls `next/server` into the browser
+bundle. If the condition is ever missed (for example the package is listed in
+`serverExternalPackages`), `getEnvAsync` throws instead of quietly leaving the render
+prerenderable.
+
+## Cache Components
+
+Which API opts the render out is decided per build:
+
+| `cacheComponents` | call           | effect                                                           |
+| ----------------- | -------------- | ---------------------------------------------------------------- |
+| `true`            | `io()`         | a dynamic hole in an otherwise static shell, still prefetchable  |
+| `false`           | `connection()` | the route waits for a real request, which also blocks prefetches |
+
+`io()` suspends like any other asynchronous call, so the shell around the read stays static
+and the code after it can be prefetched and wrapped in `"use cache"` — which is why Next
+prefers it. It only creates a dynamic boundary when Cache Components are on, though: without
+them it resolves immediately during static generation and the value ends up in the build
+output, so the package falls back to `connection()` there.
+
+The detection reads the `__NEXT_CACHE_COMPONENTS` flag Next inlines into every module it
+compiles. A build where the flag never reaches the package — it was externalised, for
+example — reads as "off" and keeps `connection()`, which is correct in both modes, only
+less eager.
+
+With Cache Components on, both `getEnvAsync` and `<WithClientEnv />` become dynamic holes
+and need a `<Suspense>` boundary around them. That is a property of the mode rather than of
+`io()` — `connection()` stalls the prerender at exactly the same point, it just refuses to
+resolve for anything short of a real navigation:
+
+```tsx
+<Suspense fallback={null}>
+  <WithClientEnv space={publicEnv} />
+</Suspense>
+```
+
+Put that boundary above the client components that read the space: the inline script is
+flushed when the boundary resolves, and a client read that runs before it throws.
 
 ## Several spaces
 
@@ -148,7 +181,8 @@ with its own type, so a missing or malformed variable names itself in the error.
 The returned space exposes:
 
 - `getEnv(key)` / `getAllEnv()` — synchronous, outside a Server Component render
-- `getEnvAsync(key)` / `getAllEnvAsync()` — inside a Server Component, awaits `connection()`
+- `getEnvAsync(key)` / `getAllEnvAsync()` — inside a Server Component, opts the render out
+  of prerendering first
 - `name`, `keys`, `schema`
 
 ### `next-env-space/server`

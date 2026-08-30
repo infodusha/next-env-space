@@ -18,8 +18,11 @@ pnpm run build      # the package itself — the fixture imports dist/
 pnpm run test:e2e   # rebuilds the package, builds the fixture, runs the suite
 ```
 
-`playwright.config.ts` at the repo root builds the fixture in `globalSetup` and
-starts `next start` on port 3210 as its `webServer`.
+`playwright.config.ts` at the repo root points its `webServer` at
+[`serve.ts`](./serve.ts), which builds the fixture and then starts it on port 3210. The build belongs there rather than in a `globalSetup`: Playwright runs
+its plugin setup — the web server among it — before the global setups, so a
+build over there would only reach the server on the next run, and every run
+would silently test the build before it.
 
 ## Routes of the fixture
 
@@ -38,4 +41,4 @@ starts `next start` on port 3210 as its `webServer`.
 
 The routes under `(published)` sit below a layout that renders `<WithClientEnv />`;
 the ones under `(bare)` do not, which is what lets `/render-guard` be prerendered
-at build time and `/async-env` prove that `connection()` really ran.
+at build time and `/async-env` prove that the prerender opt-out really ran.

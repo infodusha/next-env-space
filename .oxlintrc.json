@@ -27,7 +27,13 @@
         "allow": ["server-only"]
       }
     ],
-    "eslint/max-lines-per-function": "off"
+    "eslint/max-lines-per-function": "off",
+    "eslint/no-underscore-dangle": [
+      "error",
+      {
+        "allow": ["__NEXT_CACHE_COMPONENTS"]
+      }
+    ]
   },
   "ignorePatterns": ["dist", "**/.next", "**/next-env.d.ts"],
   "overrides": [

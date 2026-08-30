@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { fixtureDir } from "../global-setup.js";
+import { fixtureDir } from "../paths.js";
 
 const guardMessage =
   "is called while rendering, so its value can be captured at build time";

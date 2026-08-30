@@ -1,7 +1,6 @@
 import "server-only";
-import { connection } from "next/server";
-
 import { ClientEnv } from "./client.js";
+import { optOutOfPrerender } from "./dynamic.js";
 import { readProcessEnv } from "./global.js";
 import type { EnvSchema, InferEnv } from "./schema.js";
 import { readEnvSpace, type EnvSpace } from "./space.js";
@@ -10,7 +9,7 @@ export async function getEnvAsync<
   TSchema extends EnvSchema,
   TKey extends keyof TSchema,
 >(space: EnvSpace<TSchema>, key: TKey): Promise<InferEnv<TSchema>[TKey]> {
-  await connection();
+  await optOutOfPrerender();
   return readEnvSpace(space)[key];
 }
 
@@ -23,7 +22,7 @@ export async function WithClientEnv<TSchema extends EnvSchema>({
   space,
   nonce,
 }: WithClientEnvProps<TSchema>) {
-  await connection();
+  await optOutOfPrerender();
   readEnvSpace(space);
   const processEnv = readProcessEnv();
   const rawEnv = Object.fromEntries(

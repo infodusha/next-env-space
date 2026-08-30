@@ -57,7 +57,7 @@ export interface CreateEnvSpace {
 }
 
 export interface EnvRuntime {
-  readonly connection: () => Promise<void>;
+  readonly optOutOfPrerender: () => Promise<void>;
   readonly isReactServer: boolean;
 }
 
@@ -102,8 +102,8 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     }
 
     async function getAllEnvAsync(): Promise<InferEnv<TSchema>> {
-      await runtime.connection();
-      assertConnected(runtime, name);
+      await runtime.optOutOfPrerender();
+      assertOptedOut(runtime, name);
       return readAllEnv();
     }
 
@@ -173,7 +173,7 @@ function assertNotInRender(name: string, call: string): void {
   );
 }
 
-function assertConnected(runtime: EnvRuntime, name: string): void {
+function assertOptedOut(runtime: EnvRuntime, name: string): void {
   if (runtime.isReactServer || !isServerRender()) {
     return;
   }

@@ -54,6 +54,9 @@ Render `WithClientEnv` once per space, in a layout above the client components t
 It serialises the raw values into a `<script>` tag, so **everything in that space becomes
 public**. Keep secrets in a separate space that is never rendered.
 
+There is a second publisher, `UseClientEnv`, that carries the space in React context instead
+of a script — [see below](#without-the-inline-script) for what that trades away.
+
 ```tsx
 // app/layout.tsx
 import { WithClientEnv } from "next-env-space/server";
@@ -92,6 +95,52 @@ const nonce = (await headers()).get("x-nonce") ?? undefined;
 
 Do not reach for `'unsafe-inline'` to make the script run.
 
+### Without the inline script
+
+`UseClientEnv` publishes the same space through React context instead. Nothing is written
+into the document, so there is no nonce to pass and no `script-src` to widen — but it wraps
+the tree rather than sitting next to it:
+
+```tsx
+// app/layout.tsx
+import { UseClientEnv } from "next-env-space/server";
+
+import { publicEnv } from "@/env";
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <UseClientEnv space={publicEnv}>{children}</UseClientEnv>
+      </body>
+    </html>
+  );
+}
+```
+
+Providers nest, so a second space wraps the first:
+
+```tsx
+<UseClientEnv space={publicEnv}>
+  <UseClientEnv space={featureEnv}>{children}</UseClientEnv>
+</UseClientEnv>
+```
+
+What it costs is every read that does not happen while a component renders — context is
+only readable from a render. With `UseClientEnv` alone:
+
+- `get()` and `getAll()` throw in the browser; they never look at the context
+- `getAsync()` and `getAllAsync()` work inside a client component, and throw from an event
+  handler, an effect, or any other code that runs after the render
+- a read at module scope throws, for the same reason
+
+Nothing changes on the server, where the values come straight from `process.env`. Rendering
+both components is fine as well: the script answers first and the context is left unread.
+
 ## Read values
 
 ```ts
@@ -128,10 +177,13 @@ export function AppName() {
 }
 ```
 
+This is the only read `<UseClientEnv />` on its own can serve. Everything else in this
+section needs the space published with `<WithClientEnv />`.
+
 ## Cache Components
 
-With `cacheComponents` on, both `getAsync` and `<WithClientEnv />` become dynamic holes and
-need a `<Suspense>` boundary around them:
+With `cacheComponents` on, `getAsync`, `<WithClientEnv />` and `<UseClientEnv />` all become
+dynamic holes and need a `<Suspense>` boundary around them:
 
 ```tsx
 <body>
@@ -166,6 +218,8 @@ client. Spaces are independent: each has its own schema, its own cache and its o
 <WithClientEnv space={featureEnv} />
 ```
 
+`<UseClientEnv />` nests instead of repeating, and merges with the provider above it.
+
 ## API
 
 ### `createEnvSpace(schema, options?): EnvSpace`
@@ -186,8 +240,12 @@ The returned space exposes:
 
 ### `next-env-space/server`
 
-- `<WithClientEnv space={space} />` — ships one space to the browser. Takes an optional
-  `nonce` for CSP
+- `<WithClientEnv space={space} />` — ships one space to the browser in an inline
+  `<script>`, before any client module is evaluated. Takes an optional `nonce` for CSP.
+  Serves every read, `get()` included
+- `<UseClientEnv space={space}>{children}</UseClientEnv>` — ships the same space through
+  React context. No inline script and no nonce, but only `getAsync()` / `getAllAsync()`
+  can read it, and only from a component below it
 
 This entry point is marked `server-only`; importing it from a client component fails the
 build.

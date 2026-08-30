@@ -11,6 +11,9 @@ export const buildTimeEnv = {
   UNSAFE_VALUE: "build-time-unsafe",
   FEATURE_LABEL: "build-time-label",
   UNPUBLISHED_VALUE: "build-time-unpublished",
+  PROVIDED_LABEL: "build-time-provided",
+  PROVIDED_COUNT: "13579",
+  PROVIDED_NESTED: "build-time-late",
   SESSION_SECRET: "build-time-session-secret",
   BROKEN_URL: "https://build-time.example.com",
 } as const;
@@ -22,6 +25,9 @@ export const runtimeEnv = {
   UNSAFE_VALUE: "</script><script>globalThis.__pwned = true;</script>",
   FEATURE_LABEL: "runtime-label",
   UNPUBLISHED_VALUE: "runtime-unpublished",
+  PROVIDED_LABEL: "runtime-provided",
+  PROVIDED_COUNT: "24",
+  PROVIDED_NESTED: "runtime-late",
   SESSION_SECRET: "runtime-session-secret",
   // Rejected by z.url(), so the space fails on first read.
   BROKEN_URL: "not-a-url",

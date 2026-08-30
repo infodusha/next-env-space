@@ -60,6 +60,7 @@ export interface CreateEnvSpace {
 export interface EnvRuntime {
   readonly optOutOfPrerender: () => Promise<void>;
   readonly optsOutInReactServer: boolean;
+  readonly readContextRawEnv: ((name: string) => RawEnv | undefined) | null;
 }
 
 const takenNames = new Set<string>();
@@ -85,21 +86,21 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
     let cachedEnv: InferEnv<TSchema> | null = null;
 
-    function readAllEnv(): InferEnv<TSchema> {
-      cachedEnv ??= parseEnv(shape, readRawEnv(name));
+    function readAllEnv(fromContext: boolean): InferEnv<TSchema> {
+      cachedEnv ??= parseEnv(shape, readRawEnv(runtime, name, fromContext));
       return cachedEnv;
     }
 
     function getAll(): InferEnv<TSchema> {
       assertNotInRender(name, "getAll()");
-      return readAllEnv();
+      return readAllEnv(false);
     }
 
     function get<TKey extends keyof TSchema>(
       key: TKey,
     ): InferEnv<TSchema>[TKey] {
       assertNotInRender(name, `get('${String(key)}')`);
-      return readAllEnv()[key];
+      return readAllEnv(false)[key];
     }
 
     const settledReads = new Map<keyof TSchema | null, Promise<unknown>>();
@@ -113,7 +114,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       if (!isFulfilled(optedOut)) {
         return optedOut.then(() => {
           assertOptedOut(runtime, name);
-          return pick(readAllEnv());
+          return pick(readAllEnv(true));
         });
       }
 
@@ -124,7 +125,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
       try {
         assertOptedOut(runtime, name);
-        const promise = fulfilled(pick(readAllEnv()));
+        const promise = fulfilled(pick(readAllEnv(true)));
         settledReads.set(key, promise);
         return promise;
       } catch (error) {
@@ -152,7 +153,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       getAllAsync,
     };
 
-    readers.set(space, readAllEnv);
+    readers.set(space, () => readAllEnv(false));
 
     return space;
   };
@@ -170,19 +171,50 @@ export function readEnvSpace<TSchema extends EnvSchema>(
   return read() as InferEnv<TSchema>;
 }
 
-function readRawEnv(name: string): RawEnv {
+function readRawEnv(
+  runtime: EnvRuntime,
+  name: string,
+  fromContext: boolean,
+): RawEnv {
   if (typeof window === "undefined") {
     return process.env;
   }
 
-  const rawEnv = window[envSpacesKey]?.[name];
-  if (rawEnv === undefined) {
+  const published = window[envSpacesKey]?.[name];
+  if (published !== undefined) {
+    return published;
+  }
+
+  const provided = fromContext ? readProvidedEnv(runtime, name) : undefined;
+  if (provided !== undefined) {
+    return provided;
+  }
+
+  throw new Error(
+    `Env space "${name}" is missing on the client. ` +
+      `Render <WithClientEnv space={...} /> or <UseClientEnv space={...}> from ` +
+      `"next-env-space/server" above the components that read it.`,
+  );
+}
+
+function readProvidedEnv(
+  runtime: EnvRuntime,
+  name: string,
+): RawEnv | undefined {
+  const read = runtime.readContextRawEnv;
+  if (read === null) {
+    return undefined;
+  }
+
+  try {
+    return read(name);
+  } catch {
     throw new Error(
-      `Env space "${name}" is missing on the client. ` +
-        `Render <WithClientEnv space={...} /> from "next-env-space/server" in your layout.`,
+      `getAsync() of the "${name}" env space was called outside of a render, ` +
+        `where the <UseClientEnv> context cannot be read. Publish the space with ` +
+        `<WithClientEnv space={...} /> instead — it lands before any component runs.`,
     );
   }
-  return rawEnv;
 }
 
 function isServerRender(): boolean {

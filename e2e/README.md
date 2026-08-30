@@ -38,7 +38,11 @@ would silently test the build before it.
 | `/async-env`            | `space.getAsync()` on an otherwise static route           |
 | `/api/env`              | synchronous `get()` in a Route Handler                    |
 | `/api/broken`           | a value the schema rejects                                |
+| `/provided`             | a space carried by `<UseClientEnv />` context alone       |
+| `/provided-late`        | the same space read after the render, which has to fail   |
 
 The routes under `(published)` sit below a layout that renders `<WithClientEnv />`;
 the ones under `(bare)` do not, which is what lets `/render-guard` be prerendered
-at build time and `/async-env` prove that the prerender opt-out really ran.
+at build time and `/async-env` prove that the prerender opt-out really ran. The
+ones under `(provided)` sit below two nested `<UseClientEnv />` instead, so no
+inline script reaches them at all.

@@ -1,9 +1,12 @@
 "use client";
 
 import { useServerInsertedHTML } from "next/navigation";
-import { useRef } from "react";
+import { useContext, useMemo, useRef, type ReactNode } from "react";
 
+import { envContext } from "./context.js";
 import { envSpacesKey, type RawEnv } from "./global.js";
+
+const EnvContext = envContext();
 
 interface ClientEnvProps {
   readonly name: string;
@@ -31,6 +34,26 @@ export function ClientEnv({ name, rawEnv, nonce }: ClientEnvProps) {
   });
 
   return null;
+}
+
+interface ClientEnvProviderProps {
+  readonly name: string;
+  readonly rawEnv: RawEnv;
+  readonly children?: ReactNode;
+}
+
+export function ClientEnvProvider({
+  name,
+  rawEnv,
+  children,
+}: ClientEnvProviderProps) {
+  const outer = useContext(EnvContext);
+  const spaces = useMemo(
+    () => ({ ...outer, [name]: rawEnv }),
+    [outer, name, rawEnv],
+  );
+
+  return <EnvContext value={spaces}>{children}</EnvContext>;
 }
 
 function createEnvScript(name: string, rawEnv: RawEnv): string {

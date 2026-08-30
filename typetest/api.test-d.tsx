@@ -8,7 +8,7 @@ import {
 import type * as ClientEntry from "../src/index.js";
 import { createEnvSpace as createEnvSpaceRsc } from "../src/index.react-server.js";
 import type * as ServerEntry from "../src/index.react-server.js";
-import { WithClientEnv } from "../src/server.js";
+import { UseClientEnv, WithClientEnv } from "../src/server.js";
 
 // 1. plain shape
 const publicEnv = createEnvSpace(
@@ -63,6 +63,16 @@ export function Layout() {
       <WithClientEnv space={publicEnv} nonce={123} />
       {/* @ts-expect-error space is required */}
       <WithClientEnv />
+
+      <UseClientEnv space={publicEnv}>
+        <span />
+      </UseClientEnv>
+      {/* children are optional, the same way a layout may render none */}
+      <UseClientEnv space={featureEnv} />
+      {/* @ts-expect-error the context provider takes no nonce */}
+      <UseClientEnv space={publicEnv} nonce="r4nd0m" />
+      {/* @ts-expect-error space is required */}
+      <UseClientEnv>{null}</UseClientEnv>
     </>
   );
 }

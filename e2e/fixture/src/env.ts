@@ -32,3 +32,20 @@ export const unpublishedEnv = createEnvSpace(
   },
   { name: "unpublished" },
 );
+
+/** Carried by `<UseClientEnv />` context only — never written into the document. */
+export const providedEnv = createEnvSpace(
+  {
+    PROVIDED_LABEL: z.string(),
+    PROVIDED_COUNT: z.coerce.number(),
+  },
+  { name: "provided" },
+);
+
+/** Provided by a second, nested `<UseClientEnv />` — it has to merge, not replace. */
+export const providedNestedEnv = createEnvSpace(
+  {
+    PROVIDED_NESTED: z.string(),
+  },
+  { name: "provided-nested" },
+);

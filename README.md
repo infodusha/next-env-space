@@ -114,13 +114,37 @@ export default async function Page() {
 }
 ```
 
-`getEnvAsync` lives on the space itself, in the isomorphic entry point, even though the API
-it calls only exists on the server. That works through the `react-server` export condition:
-the RSC layer resolves `next-env-space` to a build that awaits the real Next API, every
-other layer gets one that awaits nothing — and never pulls `next/server` into the browser
-bundle. If the condition is ever missed (for example the package is listed in
-`serverExternalPackages`), `getEnvAsync` throws instead of quietly leaving the render
-prerenderable.
+In a client component the same call works with `use()`:
+
+```tsx
+"use client";
+
+import { use } from "react";
+
+import { publicEnv } from "@/env";
+
+export function AppName() {
+  return <h1>{use(publicEnv.getEnvAsync("APP_NAME"))}</h1>;
+}
+```
+
+The promise is the same one on every render of the same key, and comes back already settled
+wherever there was nothing to wait for. `use()` then unwraps it on the spot, rather than
+suspending on a promise the component created while rendering — which React refuses, and
+says so on the console.
+
+Without Cache Components that is every time, so the component never suspends and needs no
+`<Suspense>`. With them, `getEnvAsync` is a real boundary in a client component too, so it
+does — see below.
+
+`getEnvAsync` lives on the space itself, in the isomorphic entry point, even though
+`connection()` only exists on the server. That works through the `react-server` export
+condition: the RSC layer resolves `next-env-space` to a build that can reach for
+`connection()`, every other layer gets one that only has `io()` — and never pulls
+`next/server` into the browser bundle. `io()` is a boundary in every layer, but only with
+Cache Components; without them the isomorphic build has nothing to opt out with, so if the
+condition is ever missed (for example the package is listed in `serverExternalPackages`)
+`getEnvAsync` throws rather than quietly leaving the render prerenderable.
 
 ## Cache Components
 
@@ -148,13 +172,31 @@ and need a `<Suspense>` boundary around them. That is a property of the mode rat
 resolve for anything short of a real navigation:
 
 ```tsx
-<Suspense fallback={null}>
-  <WithClientEnv space={publicEnv} />
-</Suspense>
+<body>
+  <Suspense fallback={null}>
+    <WithClientEnv space={publicEnv} />
+    {children}
+  </Suspense>
+</body>
 ```
 
-Put that boundary above the client components that read the space: the inline script is
-flushed when the boundary resolves, and a client read that runs before it throws.
+Put that boundary **above everything that reads the space**, not tightly around
+`WithClientEnv` — the readers have to be inside it too. Whatever stays outside belongs to
+the static shell and is rendered during `next build`, where a read still answers, with the
+build machine's value: it then sits in the prerendered HTML and mismatches the runtime value
+on hydration.
+
+`getEnvAsync` is the way out of that, in a client component as much as in a Server one — its
+`io()` turns the read into a hole of its own, so the value is produced per request and the
+build fails if no boundary encloses it. What has no such escape is the synchronous
+`getEnv()` and anything read at module scope: both answer during the prerender, and neither
+guard sees it. Reading at module scope is fine in itself — the module is evaluated again in
+the server process, so it holds the runtime value — it is rendering that value into the
+static shell that captures it.
+
+This is also why `WithClientEnv` does not open a boundary of its own. Without one the build
+fails and names the route, which is the moment to place the boundary correctly; with one the
+build would pass and bake the values instead.
 
 ## Several spaces
 
@@ -182,7 +224,7 @@ The returned space exposes:
 
 - `getEnv(key)` / `getAllEnv()` — synchronous, outside a Server Component render
 - `getEnvAsync(key)` / `getAllEnvAsync()` — inside a Server Component, opts the render out
-  of prerendering first
+  of prerendering first; in a client component, safe to unwrap with `use()`
 - `name`, `keys`, `schema`
 
 ### `next-env-space/server`

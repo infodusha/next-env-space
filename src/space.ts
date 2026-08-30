@@ -9,6 +9,7 @@ import {
   type EnvSchemaInput,
   type InferEnv,
 } from "./schema.js";
+import { fulfilled, isFulfilled } from "./thenable.js";
 
 const defaultSpaceName = "default";
 
@@ -58,7 +59,7 @@ export interface CreateEnvSpace {
 
 export interface EnvRuntime {
   readonly optOutOfPrerender: () => Promise<void>;
-  readonly isReactServer: boolean;
+  readonly optsOutInReactServer: boolean;
 }
 
 const takenNames = new Set<string>();
@@ -101,16 +102,44 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       return readAllEnv()[key];
     }
 
-    async function getAllEnvAsync(): Promise<InferEnv<TSchema>> {
-      await runtime.optOutOfPrerender();
-      assertOptedOut(runtime, name);
-      return readAllEnv();
+    const settledReads = new Map<keyof TSchema | null, Promise<unknown>>();
+
+    function readAsync<TValue>(
+      key: keyof TSchema | null,
+      pick: (env: InferEnv<TSchema>) => TValue,
+    ): Promise<TValue> {
+      const optedOut = runtime.optOutOfPrerender();
+
+      if (!isFulfilled(optedOut)) {
+        return optedOut.then(() => {
+          assertOptedOut(runtime, name);
+          return pick(readAllEnv());
+        });
+      }
+
+      const remembered = settledReads.get(key);
+      if (remembered !== undefined) {
+        return remembered as Promise<TValue>;
+      }
+
+      try {
+        assertOptedOut(runtime, name);
+        const promise = fulfilled(pick(readAllEnv()));
+        settledReads.set(key, promise);
+        return promise;
+      } catch (error) {
+        return Promise.reject(error);
+      }
     }
 
-    async function getEnvAsync<TKey extends keyof TSchema>(
+    function getAllEnvAsync(): Promise<InferEnv<TSchema>> {
+      return readAsync(null, (env) => env);
+    }
+
+    function getEnvAsync<TKey extends keyof TSchema>(
       key: TKey,
     ): Promise<InferEnv<TSchema>[TKey]> {
-      return (await getAllEnvAsync())[key];
+      return readAsync(key, (env) => env[key]);
     }
 
     const space: EnvSpace<TSchema> = {
@@ -174,7 +203,7 @@ function assertNotInRender(name: string, call: string): void {
 }
 
 function assertOptedOut(runtime: EnvRuntime, name: string): void {
-  if (runtime.isReactServer || !isServerRender()) {
+  if (runtime.optsOutInReactServer || !isServerRender()) {
     return;
   }
 

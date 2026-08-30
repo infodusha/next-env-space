@@ -1,8 +1,11 @@
+import { io } from "next/cache";
+
+import { cacheComponentsEnabled } from "./cache-components.js";
 import { createEnvSpaceWith, type CreateEnvSpace } from "./space.js";
 
 export * from "./types.js";
 
 export const createEnvSpace: CreateEnvSpace = createEnvSpaceWith({
-  optOutOfPrerender: async () => {},
-  isReactServer: false,
+  optOutOfPrerender: io,
+  optsOutInReactServer: cacheComponentsEnabled,
 });

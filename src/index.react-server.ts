@@ -5,5 +5,5 @@ export * from "./types.js";
 
 export const createEnvSpace: CreateEnvSpace = createEnvSpaceWith({
   optOutOfPrerender,
-  isReactServer: true,
+  optsOutInReactServer: true,
 });

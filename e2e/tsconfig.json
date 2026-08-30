@@ -6,5 +6,11 @@
     "rootDir": "..",
     "types": ["node"]
   },
-  "include": ["globals.d.ts", "*.ts", "tests", "../playwright.config.ts"]
+  "include": [
+    "globals.d.ts",
+    "*.ts",
+    "tests",
+    "tests-cache",
+    "../playwright.config.ts"
+  ]
 }

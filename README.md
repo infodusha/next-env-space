@@ -99,6 +99,15 @@ const nonce = (await headers()).get("x-nonce") ?? undefined;
 
 Do not reach for `'unsafe-inline'` to make the script run.
 
+A per-request nonce needs every script of the page to carry it, and that does
+not combine with `cacheComponents`: the static shell is built before any
+request, so Next bakes its own bootstrap scripts into it without a nonce and
+the browser blocks them — a
+[Next limitation](https://nextjs.org/docs/app/guides/content-security-policy),
+not something `WithClientEnv` can route around. The env script itself streams
+with the nonce of the request either way. Under `cacheComponents`, prefer a
+hash-based policy or `UseClientEnv`.
+
 ### Without the inline script
 
 `UseClientEnv` publishes the same space through React context instead. Nothing is written
@@ -258,7 +267,8 @@ build.
 ## Notes
 
 - The whole space is parsed on first read and cached for the lifetime of the process, so a
-  bad value fails fast rather than at the call site that happens to need it.
+  bad value fails fast rather than at the call site that happens to need it — and the error
+  names every bad value at once, not one per restart.
 - A key the space does not declare throws in `get()` and `getAsync()` rather than reading as
   `undefined`.
 - A schema that is not a shape of zod types — a bare `z.record()`, a `z.string` that was

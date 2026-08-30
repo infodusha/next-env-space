@@ -147,6 +147,19 @@ test("a space that was never shipped fails loudly in the browser", async ({
   await expect(page.getByTestId("message")).toContainText("<WithClientEnv");
 });
 
+// The server render still answers from `process.env`, so the throw happens in
+// the browser, mid-hydration — an error boundary has to receive the real
+// message rather than an endless suspend on a fresh promise per render.
+test("a space that was never shipped fails loudly with use() too", async ({
+  page,
+}) => {
+  await page.goto("/unpublished/use");
+
+  await expect(page.getByTestId("unpublished-use-message")).toContainText(
+    'Env space "unpublished" is missing on the client.',
+  );
+});
+
 function countEnvScripts(page: Page): Promise<number> {
   return page.evaluate(
     () =>

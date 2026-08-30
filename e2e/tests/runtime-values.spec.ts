@@ -52,10 +52,23 @@ test.describe("values come from the running server, not from the build", () => {
     expect(response.ok()).toBe(true);
     expect(await response.json()).toEqual({
       appName: runtimeEnv.APP_NAME,
+      appNameAsync: runtimeEnv.APP_NAME,
       requestTimeoutSeconds: Number(runtimeEnv.REQUEST_TIMEOUT_SECONDS),
       featureEnabled: true,
       sessionSecret: runtimeEnv.SESSION_SECRET,
     });
+  });
+
+  test("a Server Action reads them, get() and getAsync() alike", async ({
+    page,
+  }) => {
+    await page.goto("/action");
+    await page.getByRole("button", { name: "read in a server action" }).click();
+
+    await expect(page.getByTestId("action-env")).toHaveText(
+      `${runtimeEnv.APP_NAME} ${runtimeEnv.APP_NAME} ` +
+        `secret:${runtimeEnv.SESSION_SECRET.length}`,
+    );
   });
 
   // Nothing else on this route is dynamic, so a build-time value would mean the

@@ -10,6 +10,7 @@ export default function SoftNavPage() {
     <main>
       <h1>soft nav</h1>
       <Link href="/client">to client page</Link>
+      <Link href="/provided">to provided page</Link>
     </main>
   );
 }

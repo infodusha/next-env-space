@@ -8,10 +8,21 @@ import type { EnvSchema } from "./schema.js";
 import { readEnvSpace, type EnvSpace } from "./space.js";
 
 export interface WithClientEnvProps<TSchema extends EnvSchema> {
+  /** The env space to ship, created by `createEnvSpace()`. */
   readonly space: EnvSpace<TSchema>;
+  /** Put on the inline `<script>` tag, for a `script-src 'nonce-...'` CSP. */
   readonly nonce?: string | undefined;
 }
 
+/**
+ * Ships one env space to the browser in an inline `<script>`, before any
+ * client module is evaluated — or from the browser itself when a client-side
+ * navigation is what mounts it. Everything in the space becomes public, so
+ * keep secrets in a space this never renders.
+ *
+ * Render it once per space, in a layout above the client components that read
+ * the space. Serves every read, the synchronous `get()` included.
+ */
 export async function WithClientEnv<TSchema extends EnvSchema>({
   space,
   nonce,
@@ -21,10 +32,20 @@ export async function WithClientEnv<TSchema extends EnvSchema>({
 }
 
 export interface UseClientEnvProps<TSchema extends EnvSchema> {
+  /** The env space to ship, created by `createEnvSpace()`. */
   readonly space: EnvSpace<TSchema>;
   readonly children?: ReactNode;
 }
 
+/**
+ * Ships one env space to the browser through React context instead of an
+ * inline `<script>`: nothing is written into the document, so there is no
+ * nonce to pass and no `script-src` to widen — but only `getAsync()` /
+ * `getAllAsync()` can read it, and only while a component below it renders.
+ *
+ * Wrap it around the tree that reads the space; a second space nests inside
+ * the first. Everything in the space still becomes public.
+ */
 export async function UseClientEnv<TSchema extends EnvSchema>({
   space,
   children,

@@ -72,6 +72,25 @@ test.describe("a space provided through context", () => {
     expect(await page.evaluate(() => window.providedEnvRenders)).toBe(1);
     expect(errors).toEqual([]);
   });
+
+  test("reaches a layout that only a client-side navigation mounts", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    await page.goto("/soft-nav");
+    await page.getByRole("link", { name: "to provided page" }).click();
+    await expect(page).toHaveURL("/provided");
+
+    await expect(page.getByTestId("provided-label")).toHaveText(
+      runtimeEnv.PROVIDED_LABEL,
+    );
+    await expect(page.getByTestId("provided-nested")).toHaveText(
+      runtimeEnv.PROVIDED_NESTED,
+    );
+    expect(errors).toEqual([]);
+  });
 });
 
 test.describe("a space that only context carries", () => {

@@ -16,3 +16,12 @@ export const brokenEnv = createEnvSpace(
   },
   { name: "broken" },
 );
+
+/** Backed by two bad values, so one read has to report both at once. */
+export const brokenPairEnv = createEnvSpace(
+  {
+    BROKEN_URL: z.url(),
+    BROKEN_COUNT: z.coerce.number(),
+  },
+  { name: "broken-pair" },
+);

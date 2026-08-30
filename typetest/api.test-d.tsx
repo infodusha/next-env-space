@@ -46,6 +46,11 @@ const nodeEnv: "production" | "development" | "test" =
   featureEnv.get("NODE_ENV");
 const all: InferEnv<typeof featureEnv.schema> = featureEnv.getAll();
 
+// @ts-expect-error a parsed space is read-only
+all.FLAG = false;
+// @ts-expect-error the key list is read-only
+publicEnv.keys.push("NOPE");
+
 // @ts-expect-error unknown key
 publicEnv.get("NOPE");
 // @ts-expect-error wrong type

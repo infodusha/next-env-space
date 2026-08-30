@@ -77,6 +77,68 @@ importers:
         specifier: ~7.0.2
         version: 7.0.2
 
+  e2e/fixture-cache:
+    dependencies:
+      next:
+        specifier: ^16.3.3
+        version: 16.3.3(@playwright/test@1.62.1)(@types/node@26.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      next-env-space:
+        specifier: workspace:*
+        version: link:../..
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      zod:
+        specifier: ^4.5.1
+        version: 4.5.1
+    devDependencies:
+      '@types/node':
+        specifier: ^26.4.0
+        version: 26.4.0
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.5(@types/react@19.2.18)
+      typescript:
+        specifier: ~7.0.2
+        version: 7.0.2
+
+  e2e/fixture-client-import:
+    dependencies:
+      next:
+        specifier: ^16.3.3
+        version: 16.3.3(@playwright/test@1.62.1)(@types/node@26.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      next-env-space:
+        specifier: workspace:*
+        version: link:../..
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      zod:
+        specifier: ^4.5.1
+        version: 4.5.1
+    devDependencies:
+      '@types/node':
+        specifier: ^26.4.0
+        version: 26.4.0
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.5(@types/react@19.2.18)
+      typescript:
+        specifier: ~7.0.2
+        version: 7.0.2
+
 packages:
 
   '@emnapi/runtime@1.11.3':

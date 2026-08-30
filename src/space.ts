@@ -10,7 +10,7 @@ import {
   type EnvSchemaInput,
   type InferEnv,
 } from "./schema.js";
-import { fulfilled, isFulfilled } from "./thenable.js";
+import { fulfilled, isFulfilled, rejected } from "./thenable.js";
 
 const defaultSpaceName = "default";
 
@@ -49,6 +49,22 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
   getAllAsync(): Promise<InferEnv<TSchema>>;
 }
 
+/**
+ * Creates an env space: a group of environment variables read from
+ * `process.env` at runtime and validated with the given zod schema. The whole
+ * space is parsed on the first read and cached for the lifetime of the
+ * process.
+ *
+ * `schema` is a shape (`{ FOO: z.string() }`) or a `z.object()` around one.
+ * Give every space of the app its own `name` — it is the key the raw values
+ * are published under on the client.
+ *
+ * @example
+ * export const publicEnv = createEnvSpace(
+ *   { APP_NAME: z.string() },
+ *   { name: "public" },
+ * );
+ */
 export interface CreateEnvSpace {
   <TSchema extends EnvSchema>(
     schema: TSchema,
@@ -62,6 +78,8 @@ export interface CreateEnvSpace {
 
 const takenSpaces = new Map<string, readonly string[]>();
 
+const warnedSpaces = new Set<string>();
+
 const readers = new WeakMap<object, () => unknown>();
 
 export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
@@ -71,7 +89,9 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
   ): EnvSpace<TSchema> {
     const name = options.name ?? defaultSpaceName;
     const shape = toEnvShape(schema, name);
-    const keys = Object.keys(shape) as (keyof TSchema & string)[];
+    const keys = Object.freeze(
+      Object.keys(shape) as (keyof TSchema & string)[],
+    );
 
     assertUniqueName(name, keys);
     takenSpaces.set(name, keys);
@@ -79,7 +99,11 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     let cachedEnv: InferEnv<TSchema> | null = null;
 
     function readAllEnv(fromContext: boolean): InferEnv<TSchema> {
-      cachedEnv ??= parseEnv(shape, readRawEnv(runtime, name, fromContext));
+      cachedEnv ??= parseEnv(
+        shape,
+        readRawEnv(runtime, name, fromContext),
+        name,
+      );
       return cachedEnv;
     }
 
@@ -122,7 +146,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
         settledReads.set(key, promise);
         return promise;
       } catch (error) {
-        return Promise.reject(error);
+        return rejected(error);
       }
     }
 
@@ -192,6 +216,11 @@ function assertUniqueName(name: string, keys: readonly string[]): void {
         `Pass a unique "name" option to createEnvSpace().`,
     );
   }
+
+  if (warnedSpaces.has(name)) {
+    return;
+  }
+  warnedSpaces.add(name);
 
   console.warn(
     `Env space "${name}" is created more than once. ` +

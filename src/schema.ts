@@ -7,7 +7,7 @@ export type EnvSchemaInput<TSchema extends EnvSchema> =
   | z.ZodObject<TSchema>;
 
 export type InferEnv<TSchema extends EnvSchema> = {
-  [TKey in keyof TSchema]: z.infer<TSchema[TKey]>;
+  readonly [TKey in keyof TSchema]: z.infer<TSchema[TKey]>;
 };
 
 interface SchemaCandidate {

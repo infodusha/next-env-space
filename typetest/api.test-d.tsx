@@ -83,10 +83,26 @@ createEnvSpace({ FOO: "z.string()" }, { name: "bare-value" });
 // @ts-expect-error a schema factory has to be called
 createEnvSpace({ FOO: z.string }, { name: "uncalled" });
 
+// An object of the right shape is still not an env space: the type is branded,
+// so only what createEnvSpace() returns fits the `space` prop.
+const handRolled = {
+  name: "hand-rolled",
+  keys: [] as const,
+  schema: {},
+  get: publicEnv.get,
+  getAll: publicEnv.getAll,
+  getAsync: publicEnv.getAsync,
+  getAllAsync: publicEnv.getAllAsync,
+};
+
 export function Layout() {
   return (
     <>
       <WithClientEnv space={publicEnv} />
+      {/* @ts-expect-error only createEnvSpace() produces an env space */}
+      <WithClientEnv space={handRolled} />
+      {/* @ts-expect-error the same brand guards the context provider */}
+      <UseClientEnv space={handRolled} />
       <WithClientEnv space={featureEnv} />
       <WithClientEnv space={mixedEnv} />
       <WithClientEnv space={publicEnv} nonce="r4nd0m" />

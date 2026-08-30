@@ -56,8 +56,8 @@ export const serverEnv = createEnvSpace(
 ```
 
 The schema is always a shape with one schema per key. A single object schema around the keys —
-`z.object({ ... })`, `v.object({ ... })` — is rejected: Standard Schema does not expose the keys
-an object declares, and every variable is parsed on its own so a bad one can name itself.
+`z.object({ ... })`, `v.object({ ... })` — does not type-check: Standard Schema does not expose
+the keys an object declares, and every variable is parsed on its own so a bad one can name itself.
 
 ## Send a space to the browser
 
@@ -283,9 +283,6 @@ build.
   names every bad value at once, not one per restart.
 - A key the space does not declare throws in `get()` and `getAsync()` rather than reading as
   `undefined`.
-- A schema that is not a shape of Standard Schemas — a single `z.object()`, a `z.string`
-  that was never called, a plain value — is rejected by `createEnvSpace()` itself, not by the
-  first read of it.
 - Schemas have to validate synchronously: the values are parsed on the spot, so a key with
   an async refinement throws on its first read.
 - Two spaces under one `name` overwrite each other on the client. That warns, and in

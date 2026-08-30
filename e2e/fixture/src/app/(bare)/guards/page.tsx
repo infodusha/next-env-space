@@ -1,5 +1,4 @@
 import { createEnvSpace } from "next-env-space";
-import { WithClientEnv } from "next-env-space/server";
 import * as z from "zod";
 
 import { publicEnv } from "@/env";
@@ -13,24 +12,6 @@ export const dynamic = "force-dynamic";
 
 export default async function GuardsPage() {
   const guards: Record<string, string> = {
-    "not-an-object": message(() =>
-      createEnvSpace("APP_NAME" as never, { name: "guard-string" }),
-    ),
-    "single-schema": message(() =>
-      createEnvSpace(z.record(z.string(), z.string()) as never, {
-        name: "guard-record",
-      }),
-    ),
-    "not-a-schema": message(() =>
-      createEnvSpace({ GUARD_VALUE: "z.string()" } as never, {
-        name: "guard-value",
-      }),
-    ),
-    "uncalled-schema": message(() =>
-      createEnvSpace({ GUARD_VALUE: z.string } as never, {
-        name: "guard-uncalled",
-      }),
-    ),
     "async-schema": await messageAsync(() =>
       createEnvSpace(
         { APP_NAME: z.string().refine(() => Promise.resolve(true)) },
@@ -42,9 +23,6 @@ export default async function GuardsPage() {
       createEnvSpace({ GUARD_B: z.string() }, { name: "guard-duplicate" });
     }),
     "unknown-key": message(() => publicEnv.get("NOPE" as never)),
-    "missing-space": await messageAsync(() =>
-      WithClientEnv({ space: undefined as never }),
-    ),
   };
 
   return (

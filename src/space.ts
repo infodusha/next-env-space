@@ -3,7 +3,7 @@ import * as react from "react";
 import { parseEnv } from "./parse.js";
 import { isProduction } from "./process-env.js";
 import { readRawEnv, type EnvRuntime } from "./raw-env.js";
-import { assertEnvShape, type EnvSchema, type InferEnv } from "./schema.js";
+import type { EnvSchema, InferEnv } from "./schema.js";
 import { fulfilled, isFulfilled, rejected } from "./thenable.js";
 
 const defaultSpaceName = "default";
@@ -18,7 +18,10 @@ export interface EnvSpaceOptions {
   readonly name?: string;
 }
 
+declare const envSpaceBrand: unique symbol;
+
 export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
+  readonly [envSpaceBrand]: true;
   readonly name: string;
   readonly keys: readonly (keyof TSchema & string)[];
   readonly schema: TSchema;
@@ -79,7 +82,6 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     options: EnvSpaceOptions = {},
   ): EnvSpace<TSchema> {
     const name = options.name ?? defaultSpaceName;
-    assertEnvShape(schema, name);
     const keys = Object.freeze(
       Object.keys(schema) as (keyof TSchema & string)[],
     );
@@ -152,7 +154,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       return readAsync(key, (env) => env[key]);
     }
 
-    const space: EnvSpace<TSchema> = {
+    const space = {
       name,
       keys,
       schema,
@@ -160,7 +162,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       getAll,
       getAsync,
       getAllAsync,
-    };
+    } as EnvSpace<TSchema>;
 
     readers.set(space, () => readAllEnv(false));
 
@@ -171,12 +173,6 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 export function readEnvSpace<TSchema extends EnvSchema>(
   space: EnvSpace<TSchema>,
 ): InferEnv<TSchema> {
-  if (!isEnvSpaceLike(space)) {
-    throw new Error(
-      `The "space" prop needs an env space created by createEnvSpace().`,
-    );
-  }
-
   const read = readers.get(space);
   if (read === undefined) {
     throw new Error(
@@ -184,14 +180,6 @@ export function readEnvSpace<TSchema extends EnvSchema>(
     );
   }
   return read() as InferEnv<TSchema>;
-}
-
-function isEnvSpaceLike(space: unknown): boolean {
-  return (
-    typeof space === "object" &&
-    space !== null &&
-    typeof (space as { name?: unknown }).name === "string"
-  );
 }
 
 function assertUniqueName(name: string, keys: readonly string[]): void {

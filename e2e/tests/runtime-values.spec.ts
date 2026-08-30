@@ -58,18 +58,11 @@ test.describe("values come from the running server, not from the build", () => {
     });
   });
 
-  // Nothing else on these routes is dynamic, so a build-time value would mean
-  // connection() never ran and the route was baked at build time.
-  for (const [name, url] of [
-    ["space.getEnvAsync()", "/async-env"],
-    ["getEnvAsync(space, key)", "/async-env/standalone"],
-  ] as const) {
-    test(`${name} opts its route out of prerendering`, async ({ page }) => {
-      await page.goto(url);
+  // Nothing else on this route is dynamic, so a build-time value would mean the
+  // opt-out never ran and the route was baked at build time.
+  test("getEnvAsync() opts its route out of prerendering", async ({ page }) => {
+    await page.goto("/async-env");
 
-      await expect(page.getByTestId("app-name")).toHaveText(
-        runtimeEnv.APP_NAME,
-      );
-    });
-  }
+    await expect(page.getByTestId("app-name")).toHaveText(runtimeEnv.APP_NAME);
+  });
 });

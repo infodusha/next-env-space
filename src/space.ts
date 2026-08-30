@@ -209,7 +209,8 @@ function assertOptedOut(runtime: EnvRuntime, name: string): void {
 
   throw new Error(
     `getEnvAsync() of the "${name}" env space could not opt the render out of prerendering: ` +
-      `"next-env-space" was resolved without the "react-server" export condition. ` +
-      `Remove it from serverExternalPackages, or use getEnvAsync(space, key) from "next-env-space/server".`,
+      `"next-env-space" was resolved without the "react-server" export condition, leaving it ` +
+      `with io(), which is only a boundary under cacheComponents. ` +
+      `Turn cacheComponents on, or find what resolves the package without that condition.`,
   );
 }

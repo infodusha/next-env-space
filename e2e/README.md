@@ -36,7 +36,6 @@ would silently test the build before it.
 | `/render-guard`         | `getEnv()` during a build-time prerender                     |
 | `/render-guard/dynamic` | `getEnv()` during a dynamic render                           |
 | `/async-env`            | `space.getEnvAsync()` on an otherwise static route           |
-| `/async-env/standalone` | `getEnvAsync(space, key)` from `next-env-space/server`       |
 | `/api/env`              | synchronous `getEnv()` in a Route Handler                    |
 | `/api/broken`           | a value the schema rejects                                   |
 

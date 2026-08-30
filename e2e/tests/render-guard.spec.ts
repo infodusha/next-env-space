@@ -36,8 +36,5 @@ test.describe("prerendering", () => {
 
   test("a route that calls getEnvAsync() does not", () => {
     expect(existsSync(path.join(appDir, "async-env.html"))).toBe(false);
-    expect(existsSync(path.join(appDir, "async-env", "standalone.html"))).toBe(
-      false,
-    );
   });
 });

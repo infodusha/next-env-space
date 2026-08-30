@@ -142,9 +142,9 @@ does — see below.
 condition: the RSC layer resolves `next-env-space` to a build that can reach for
 `connection()`, every other layer gets one that only has `io()` — and never pulls
 `next/server` into the browser bundle. `io()` is a boundary in every layer, but only with
-Cache Components; without them the isomorphic build has nothing to opt out with, so if the
-condition is ever missed (for example the package is listed in `serverExternalPackages`)
-`getEnvAsync` throws rather than quietly leaving the render prerenderable.
+Cache Components, so a Server Component that ends up on the isomorphic build without them
+has nothing to opt out with. `getEnvAsync` throws there rather than quietly leaving the
+render prerenderable.
 
 ## Cache Components
 
@@ -231,8 +231,6 @@ The returned space exposes:
 
 - `<WithClientEnv space={space} />` — ships one space to the browser. Takes an optional
   `nonce` for CSP
-- `getEnvAsync(space, key)` — standalone form of `space.getEnvAsync(key)`, for setups where
-  the `react-server` condition cannot be applied
 
 This entry point is marked `server-only`; importing it from a client component fails the
 build.

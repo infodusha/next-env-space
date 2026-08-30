@@ -2,16 +2,8 @@ import "server-only";
 import { ClientEnv } from "./client.js";
 import { optOutOfPrerender } from "./dynamic.js";
 import { readProcessEnv } from "./global.js";
-import type { EnvSchema, InferEnv } from "./schema.js";
+import type { EnvSchema } from "./schema.js";
 import { readEnvSpace, type EnvSpace } from "./space.js";
-
-export async function getEnvAsync<
-  TSchema extends EnvSchema,
-  TKey extends keyof TSchema,
->(space: EnvSpace<TSchema>, key: TKey): Promise<InferEnv<TSchema>[TKey]> {
-  await optOutOfPrerender();
-  return readEnvSpace(space)[key];
-}
 
 export interface WithClientEnvProps<TSchema extends EnvSchema> {
   readonly space: EnvSpace<TSchema>;

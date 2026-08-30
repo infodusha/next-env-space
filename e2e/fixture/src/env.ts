@@ -1,4 +1,5 @@
 import { createEnvSpace } from "next-env-space";
+import * as v from "valibot";
 import * as z from "zod";
 
 /** Shipped to the browser by the `(published)` layout. */
@@ -17,11 +18,14 @@ export const publicEnv = createEnvSpace(
   { name: "public" },
 );
 
-/** A second public space, to prove spaces stay independent. */
+/**
+ * A second public space, to prove spaces stay independent — declared with
+ * valibot, to prove any Standard Schema library works.
+ */
 export const featureEnv = createEnvSpace(
-  z.object({
-    FEATURE_LABEL: z.string(),
-  }),
+  {
+    FEATURE_LABEL: v.string(),
+  },
   { name: "feature" },
 );
 

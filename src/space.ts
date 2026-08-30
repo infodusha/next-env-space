@@ -1,15 +1,9 @@
 import * as react from "react";
-import type * as z from "zod";
 
 import { parseEnv } from "./parse.js";
 import { isProduction } from "./process-env.js";
 import { readRawEnv, type EnvRuntime } from "./raw-env.js";
-import {
-  toEnvShape,
-  type EnvSchema,
-  type EnvSchemaInput,
-  type InferEnv,
-} from "./schema.js";
+import { assertEnvShape, type EnvSchema, type InferEnv } from "./schema.js";
 import { fulfilled, isFulfilled, rejected } from "./thenable.js";
 
 const defaultSpaceName = "default";
@@ -51,13 +45,14 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
 
 /**
  * Creates an env space: a group of environment variables read from
- * `process.env` at runtime and validated with the given zod schema. The whole
- * space is parsed on the first read and cached for the lifetime of the
+ * `process.env` at runtime, each validated with its own Standard Schema —
+ * zod, valibot, arktype or any other library that implements the spec. The
+ * whole space is parsed on the first read and cached for the lifetime of the
  * process.
  *
- * `schema` is a shape (`{ FOO: z.string() }`) or a `z.object()` around one.
- * Give every space of the app its own `name` — it is the key the raw values
- * are published under on the client.
+ * `schema` is a shape with one schema per key (`{ FOO: z.string() }`). Give
+ * every space of the app its own `name` — it is the key the raw values are
+ * published under on the client.
  *
  * @example
  * export const publicEnv = createEnvSpace(
@@ -70,10 +65,6 @@ export interface CreateEnvSpace {
     schema: TSchema,
     options?: EnvSpaceOptions,
   ): EnvSpace<TSchema>;
-  <TSchema extends EnvSchema>(
-    schema: z.ZodObject<TSchema>,
-    options?: EnvSpaceOptions,
-  ): EnvSpace<TSchema>;
 }
 
 const takenSpaces = new Map<string, readonly string[]>();
@@ -84,13 +75,13 @@ const readers = new WeakMap<object, () => unknown>();
 
 export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
   return function createEnvSpace<TSchema extends EnvSchema>(
-    schema: EnvSchemaInput<TSchema>,
+    schema: TSchema,
     options: EnvSpaceOptions = {},
   ): EnvSpace<TSchema> {
     const name = options.name ?? defaultSpaceName;
-    const shape = toEnvShape(schema, name);
+    assertEnvShape(schema, name);
     const keys = Object.freeze(
-      Object.keys(shape) as (keyof TSchema & string)[],
+      Object.keys(schema) as (keyof TSchema & string)[],
     );
 
     assertUniqueName(name, keys);
@@ -100,7 +91,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
     function readAllEnv(fromContext: boolean): InferEnv<TSchema> {
       cachedEnv ??= parseEnv(
-        shape,
+        schema,
         readRawEnv(runtime, name, fromContext),
         name,
       );
@@ -115,7 +106,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     function get<TKey extends keyof TSchema>(
       key: TKey,
     ): InferEnv<TSchema>[TKey] {
-      assertKnownKey(shape, name, key);
+      assertKnownKey(schema, name, key);
       assertNotInRender(name, `get('${String(key)}')`);
       return readAllEnv(false)[key];
     }
@@ -157,14 +148,14 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     function getAsync<TKey extends keyof TSchema>(
       key: TKey,
     ): Promise<InferEnv<TSchema>[TKey]> {
-      assertKnownKey(shape, name, key);
+      assertKnownKey(schema, name, key);
       return readAsync(key, (env) => env[key]);
     }
 
     const space: EnvSpace<TSchema> = {
       name,
       keys,
-      schema: shape,
+      schema,
       get,
       getAll,
       getAsync,
@@ -235,15 +226,15 @@ function sameKeys(taken: readonly string[], keys: readonly string[]): boolean {
 }
 
 function assertKnownKey(
-  shape: EnvSchema,
+  schema: EnvSchema,
   name: string,
   key: PropertyKey,
 ): void {
-  if (Object.hasOwn(shape, key)) {
+  if (Object.hasOwn(schema, key)) {
     return;
   }
 
-  const known = Object.keys(shape);
+  const known = Object.keys(schema);
   throw new Error(
     `Key "${String(key)}" is not in the "${name}" env space. ` +
       (known.length === 0

@@ -1,13 +1,16 @@
 {
   "name": "next-env-space",
   "version": "2.0.0",
-  "description": "Runtime environment variables for Next.js, validated with zod and grouped into isolated spaces",
+  "description": "Runtime environment variables for Next.js, validated with any Standard Schema library and grouped into isolated spaces",
   "keywords": [
+    "arktype",
     "env",
     "environment",
     "next",
     "nextjs",
     "runtime",
+    "standard-schema",
+    "valibot",
     "zod"
   ],
   "license": "Apache-2.0",
@@ -64,12 +67,14 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
     "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
+    "arktype": "^2.2.3",
     "husky": "^9.1.7",
     "lint-staged": "^17.4.1",
     "next": "^16.3.3",
@@ -77,11 +82,11 @@
     "oxlint": "^1.80.0",
     "react": "^19.2.8",
     "typescript": "~7.0.2",
-    "zod": "^4.5.1"
+    "valibot": "^1.4.2",
+    "zod": "^4.5.3"
   },
   "peerDependencies": {
     "next": "^16.3.3",
-    "react": "^19.2.8",
-    "zod": "^4.5.1"
+    "react": "^19.2.8"
   }
 }

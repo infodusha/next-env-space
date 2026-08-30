@@ -1,10 +1,12 @@
 # next-env-space
 
-Runtime environment variables for Next.js, validated with [zod](https://zod.dev) and grouped
-into isolated **spaces**.
+Runtime environment variables for Next.js, validated with any
+[Standard Schema](https://standardschema.dev) library — zod, valibot, arktype and the rest —
+and grouped into isolated **spaces**.
 
 - values are read from `process.env` **at runtime**, never inlined at build time
-- one schema, one type — `get("APP_NAME")` is fully typed
+- one schema per key, one type — `get("APP_NAME")` is fully typed
+- bring your own schema library: anything that implements Standard Schema plugs in
 - several spaces per app: ship one to the browser, keep another server-only
 - a guard that fails loudly when a value would be captured during a prerender
 
@@ -14,7 +16,9 @@ into isolated **spaces**.
 npm i next-env-space
 ```
 
-`next`, `react` and `zod` are peer dependencies.
+`next` and `react` are peer dependencies. The schema library is yours to pick — every
+example below uses [zod](https://zod.dev), but any
+[Standard Schema](https://standardschema.dev) implementation works the same way.
 
 ## Define a space
 
@@ -36,17 +40,24 @@ export const publicEnv = createEnvSpace(
 );
 ```
 
-A `z.object()` works as well:
+Another library plugs in the same way — [valibot](https://valibot.dev) here — and keys from
+different libraries may share one shape:
 
 ```ts
+import * as v from "valibot";
+
 export const serverEnv = createEnvSpace(
-  z.object({
-    DATABASE_URL: z.url(),
-    SESSION_SECRET: z.string().min(32),
-  }),
+  {
+    DATABASE_URL: v.pipe(v.string(), v.url()),
+    SESSION_SECRET: v.pipe(v.string(), v.minLength(32)),
+  },
   { name: "server" },
 );
 ```
+
+The schema is always a shape with one schema per key. A single object schema around the keys —
+`z.object({ ... })`, `v.object({ ... })` — is rejected: Standard Schema does not expose the keys
+an object declares, and every variable is parsed on its own so a bad one can name itself.
 
 ## Send a space to the browser
 
@@ -237,8 +248,9 @@ client. Spaces are independent: each has its own schema, its own cache and its o
 
 ### `createEnvSpace(schema, options?): EnvSpace`
 
-`schema` is a shape (`{ FOO: z.string() }`) or a `z.object()` around one. Every key is parsed
-with its own type, so a missing or malformed variable names itself in the error.
+`schema` is a shape with one [Standard Schema](https://standardschema.dev) per key
+(`{ FOO: z.string() }`), from any library that implements the spec. Every key is parsed with
+its own schema, so a missing or malformed variable names itself in the error.
 
 | option | default     | meaning                               |
 | ------ | ----------- | ------------------------------------- |
@@ -271,8 +283,11 @@ build.
   names every bad value at once, not one per restart.
 - A key the space does not declare throws in `get()` and `getAsync()` rather than reading as
   `undefined`.
-- A schema that is not a shape of zod types — a bare `z.record()`, a `z.string` that was
-  never called — is rejected by `createEnvSpace()` itself, not by the first read of it.
+- A schema that is not a shape of Standard Schemas — a single `z.object()`, a `z.string`
+  that was never called, a plain value — is rejected by `createEnvSpace()` itself, not by the
+  first read of it.
+- Schemas have to validate synchronously: the values are parsed on the spot, so a key with
+  an async refinement throws on its first read.
 - Two spaces under one `name` overwrite each other on the client. That warns, and in
   production, where a rebuild rather than a hot reload is what re-evaluates a module, it
   throws as soon as their keys differ.
@@ -280,5 +295,5 @@ build.
   malformed value fails there rather than in the browser at the first read.
 - Do not use the `NEXT_PUBLIC_` prefix: those are inlined at build time, which is exactly
   what this package avoids.
-- Values must be `string | undefined` on the way in — use `z.coerce.*`, `z.stringbool()` or
-  `z.preprocess()` for anything else.
+- Values must be `string | undefined` on the way in — use `z.coerce.*`, `z.stringbool()`,
+  `z.preprocess()`, or what your library offers for the same, for anything else.

@@ -27,7 +27,7 @@ test.describe("values come from the running server, not from the build", () => {
     }
   });
 
-  test("zod coerces every key with its own type", async ({ page }) => {
+  test("every key is parsed with its own schema", async ({ page }) => {
     await page.goto("/");
 
     await expect(page.getByTestId("server-timeout-type")).toHaveText("number");

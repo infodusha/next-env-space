@@ -16,20 +16,26 @@ export default async function GuardsPage() {
     "not-an-object": message(() =>
       createEnvSpace("APP_NAME" as never, { name: "guard-string" }),
     ),
-    "zod-type": message(() =>
+    "single-schema": message(() =>
       createEnvSpace(z.record(z.string(), z.string()) as never, {
         name: "guard-record",
       }),
     ),
-    "not-a-zod-type": message(() =>
+    "not-a-schema": message(() =>
       createEnvSpace({ GUARD_VALUE: "z.string()" } as never, {
         name: "guard-value",
       }),
     ),
-    "uncalled-zod-type": message(() =>
+    "uncalled-schema": message(() =>
       createEnvSpace({ GUARD_VALUE: z.string } as never, {
         name: "guard-uncalled",
       }),
+    ),
+    "async-schema": await messageAsync(() =>
+      createEnvSpace(
+        { APP_NAME: z.string().refine(() => Promise.resolve(true)) },
+        { name: "guard-async" },
+      ).getAsync("APP_NAME"),
     ),
     "duplicate-name": message(() => {
       createEnvSpace({ GUARD_A: z.string() }, { name: "guard-duplicate" });

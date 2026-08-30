@@ -1,3 +1,5 @@
+import { type } from "arktype";
+import * as v from "valibot";
 import * as z from "zod";
 
 import {
@@ -10,7 +12,7 @@ import { createEnvSpace as createEnvSpaceRsc } from "../src/index.react-server.j
 import type * as ServerEntry from "../src/index.react-server.js";
 import { UseClientEnv, WithClientEnv } from "../src/server.js";
 
-// 1. plain shape
+// 1. zod
 const publicEnv = createEnvSpace(
   {
     APP_NAME: z.string(),
@@ -21,20 +23,32 @@ const publicEnv = createEnvSpace(
       falsy: ["FALSE"],
     }),
     SERVICE_URLS: z.preprocess(
-      (v) => JSON.parse(v as string) as unknown,
+      (raw) => JSON.parse(raw as string) as unknown,
       z.record(z.string(), z.string()),
     ),
   },
   { name: "public" },
 );
 
-// 2. z.object()
+// 2. valibot — any Standard Schema library plugs in the same way
 const featureEnv = createEnvSpace(
-  z.object({
-    NODE_ENV: z.enum(["production", "development", "test"]),
-    FLAG: z.stringbool(),
-  }),
+  {
+    NODE_ENV: v.picklist(["production", "development", "test"]),
+    FLAG: v.pipe(
+      v.string(),
+      v.transform((value) => value === "true"),
+    ),
+  },
   { name: "feature" },
+);
+
+// 3. arktype next to zod in one shape — every key brings its own library
+const mixedEnv = createEnvSpace(
+  {
+    PORT: type("string.numeric.parse"),
+    HOST: z.string(),
+  },
+  { name: "mixed" },
 );
 
 const appName: string = publicEnv.get("APP_NAME");
@@ -44,6 +58,9 @@ const featureEnabled: boolean = publicEnv.get("FEATURE_ENABLED");
 const serviceUrls: Record<string, string> = publicEnv.get("SERVICE_URLS");
 const nodeEnv: "production" | "development" | "test" =
   featureEnv.get("NODE_ENV");
+const flag: boolean = featureEnv.get("FLAG");
+const port: number = mixedEnv.get("PORT");
+const host: string = mixedEnv.get("HOST");
 const all: InferEnv<typeof featureEnv.schema> = featureEnv.getAll();
 
 // @ts-expect-error a parsed space is read-only
@@ -56,11 +73,22 @@ publicEnv.get("NOPE");
 // @ts-expect-error wrong type
 const wrong: number = publicEnv.get("APP_NAME");
 
+// A single object schema is not a shape: Standard Schema exposes no keys.
+// @ts-expect-error pass the shape, not z.object() around it
+createEnvSpace(z.object({ FOO: z.string() }), { name: "zod-object" });
+// @ts-expect-error pass the shape, not v.object() around it
+createEnvSpace(v.object({ FOO: v.string() }), { name: "valibot-object" });
+// @ts-expect-error every key needs a schema, not a bare value
+createEnvSpace({ FOO: "z.string()" }, { name: "bare-value" });
+// @ts-expect-error a schema factory has to be called
+createEnvSpace({ FOO: z.string }, { name: "uncalled" });
+
 export function Layout() {
   return (
     <>
       <WithClientEnv space={publicEnv} />
       <WithClientEnv space={featureEnv} />
+      <WithClientEnv space={mixedEnv} />
       <WithClientEnv space={publicEnv} nonce="r4nd0m" />
       {/* an optional nonce must survive `exactOptionalPropertyTypes` */}
       <WithClientEnv space={publicEnv} nonce={undefined} />
@@ -89,6 +117,9 @@ export {
   featureEnabled,
   serviceUrls,
   nodeEnv,
+  flag,
+  port,
+  host,
   all,
   wrong,
 };
@@ -103,10 +134,11 @@ const bothWays: ServerEntry.CreateEnvSpace = createEnvSpace as CreateEnvSpace;
 async function methods() {
   const name: string = await publicEnv.getAsync("APP_NAME");
   const everything = await featureEnv.getAllAsync();
-  const flag: boolean = everything.FLAG;
+  const everythingFlag: boolean = everything.FLAG;
+  const asyncPort: number = await mixedEnv.getAsync("PORT");
   // @ts-expect-error unknown key
   await publicEnv.getAsync("NOPE");
-  return [name, flag, sameShape, bothWays] as const;
+  return [name, everythingFlag, asyncPort, sameShape, bothWays] as const;
 }
 
 export { methods };

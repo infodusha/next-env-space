@@ -17,29 +17,26 @@ jobs:
       pull-requests: write
       id-token: write
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         id: release
         with:
           release-type: node
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         if: ${{ steps.release.outputs.release_created }}
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/setup@v2
         if: ${{ steps.release.outputs.release_created }}
         with:
           version: 11
+          install: false
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: ${{ steps.release.outputs.release_created }}
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-
-      # Trusted publishing needs npm >= 11.5.1
-      - run: npm install -g npm@latest
-        if: ${{ steps.release.outputs.release_created }}
 
       - run: pnpm install --frozen-lockfile
         if: ${{ steps.release.outputs.release_created }}

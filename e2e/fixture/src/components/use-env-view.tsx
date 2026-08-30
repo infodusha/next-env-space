@@ -12,9 +12,9 @@ import { featureEnv, publicEnv } from "@/env";
 export function UseEnvView() {
   countRender();
 
-  const appName = use(publicEnv.getEnvAsync("APP_NAME"));
-  const env = use(publicEnv.getAllEnvAsync());
-  const featureLabel = use(featureEnv.getEnvAsync("FEATURE_LABEL"));
+  const appName = use(publicEnv.getAsync("APP_NAME"));
+  const env = use(publicEnv.getAllAsync());
+  const featureLabel = use(featureEnv.getAsync("FEATURE_LABEL"));
 
   return (
     <section data-testid="use-env">

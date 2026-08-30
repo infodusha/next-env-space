@@ -7,7 +7,7 @@ export default function DynamicRenderGuardPage() {
   let message = "no error";
 
   try {
-    publicEnv.getEnv("APP_NAME");
+    publicEnv.get("APP_NAME");
   } catch (error) {
     message = error instanceof Error ? error.message : String(error);
   }

@@ -1,11 +1,11 @@
 import { publicEnv } from "@/env";
 
-/** `getEnv()` inside a Server Component render has to be rejected. */
+/** `get()` inside a Server Component render has to be rejected. */
 export default function RenderGuardPage() {
   let message = "no error";
 
   try {
-    publicEnv.getEnv("APP_NAME");
+    publicEnv.get("APP_NAME");
   } catch (error) {
     message = error instanceof Error ? error.message : String(error);
   }

@@ -4,8 +4,8 @@ import { PublicEnvView } from "@/components/public-env-view";
 import { publicEnv } from "@/env";
 
 export default async function HomePage() {
-  const appName = await publicEnv.getEnvAsync("APP_NAME");
-  const env = await publicEnv.getAllEnvAsync();
+  const appName = await publicEnv.getAsync("APP_NAME");
+  const env = await publicEnv.getAllAsync();
 
   return (
     <main>

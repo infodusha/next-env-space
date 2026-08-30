@@ -3,7 +3,7 @@ import Link from "next/link";
 import { UseEnvView } from "@/components/use-env-view";
 
 /**
- * `getEnvAsync()` unwrapped with `use()` in a client component. No `<Suspense>`
+ * `getAsync()` unwrapped with `use()` in a client component. No `<Suspense>`
  * around it on purpose: this app runs without Cache Components, so there is no
  * prerender to opt out of and the promise is handed back already settled.
  */

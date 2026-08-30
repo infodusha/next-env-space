@@ -30,20 +30,20 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
   /**
    * Reads a single variable. Safe at module scope, in client components and in
    * server code that already opted out of prerendering. Throws when called
-   * while a Server Component renders — use `getEnvAsync` there.
+   * while a Server Component renders — use `getAsync` there.
    */
-  getEnv<TKey extends keyof TSchema>(key: TKey): InferEnv<TSchema>[TKey];
-  /** Reads the whole space at once, with the same rules as `getEnv`. */
-  getAllEnv(): InferEnv<TSchema>;
+  get<TKey extends keyof TSchema>(key: TKey): InferEnv<TSchema>[TKey];
+  /** Reads the whole space at once, with the same rules as `get`. */
+  getAll(): InferEnv<TSchema>;
   /**
    * Reads a single variable inside a Server Component. Opts the render out of
    * prerendering first, so the value is always the one of the running server.
    */
-  getEnvAsync<TKey extends keyof TSchema>(
+  getAsync<TKey extends keyof TSchema>(
     key: TKey,
   ): Promise<InferEnv<TSchema>[TKey]>;
-  /** Reads the whole space at once, with the same rules as `getEnvAsync`. */
-  getAllEnvAsync(): Promise<InferEnv<TSchema>>;
+  /** Reads the whole space at once, with the same rules as `getAsync`. */
+  getAllAsync(): Promise<InferEnv<TSchema>>;
 }
 
 export interface CreateEnvSpace {
@@ -90,15 +90,15 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       return cachedEnv;
     }
 
-    function getAllEnv(): InferEnv<TSchema> {
-      assertNotInRender(name, "getAllEnv()");
+    function getAll(): InferEnv<TSchema> {
+      assertNotInRender(name, "getAll()");
       return readAllEnv();
     }
 
-    function getEnv<TKey extends keyof TSchema>(
+    function get<TKey extends keyof TSchema>(
       key: TKey,
     ): InferEnv<TSchema>[TKey] {
-      assertNotInRender(name, `getEnv('${String(key)}')`);
+      assertNotInRender(name, `get('${String(key)}')`);
       return readAllEnv()[key];
     }
 
@@ -132,11 +132,11 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       }
     }
 
-    function getAllEnvAsync(): Promise<InferEnv<TSchema>> {
+    function getAllAsync(): Promise<InferEnv<TSchema>> {
       return readAsync(null, (env) => env);
     }
 
-    function getEnvAsync<TKey extends keyof TSchema>(
+    function getAsync<TKey extends keyof TSchema>(
       key: TKey,
     ): Promise<InferEnv<TSchema>[TKey]> {
       return readAsync(key, (env) => env[key]);
@@ -146,10 +146,10 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       name,
       keys,
       schema: shape,
-      getEnv,
-      getAllEnv,
-      getEnvAsync,
-      getAllEnvAsync,
+      get,
+      getAll,
+      getAsync,
+      getAllAsync,
     };
 
     readers.set(space, readAllEnv);
@@ -198,7 +198,7 @@ function assertNotInRender(name: string, call: string): void {
 
   throw new Error(
     `${call} of the "${name}" env space is called while rendering, so its value can be captured at build time. ` +
-      `Use getEnvAsync() instead, or read it at module scope.`,
+      `Use getAsync() instead, or read it at module scope.`,
   );
 }
 
@@ -208,7 +208,7 @@ function assertOptedOut(runtime: EnvRuntime, name: string): void {
   }
 
   throw new Error(
-    `getEnvAsync() of the "${name}" env space could not opt the render out of prerendering: ` +
+    `getAsync() of the "${name}" env space could not opt the render out of prerendering: ` +
       `"next-env-space" was resolved without the "react-server" export condition, leaving it ` +
       `with io(), which is only a boundary under cacheComponents. ` +
       `Turn cacheComponents on, or find what resolves the package without that condition.`,

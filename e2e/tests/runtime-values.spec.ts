@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { buildTimeEnv, runtimeEnv } from "../env.js";
 
 test.describe("values come from the running server, not from the build", () => {
-  test("a Server Component reads them with getEnvAsync()", async ({ page }) => {
+  test("a Server Component reads them with getAsync()", async ({ page }) => {
     await page.goto("/");
 
     await expect(page.getByTestId("server-app-name")).toHaveText(
@@ -60,7 +60,7 @@ test.describe("values come from the running server, not from the build", () => {
 
   // Nothing else on this route is dynamic, so a build-time value would mean the
   // opt-out never ran and the route was baked at build time.
-  test("getEnvAsync() opts its route out of prerendering", async ({ page }) => {
+  test("getAsync() opts its route out of prerendering", async ({ page }) => {
     await page.goto("/async-env");
 
     await expect(page.getByTestId("app-name")).toHaveText(runtimeEnv.APP_NAME);

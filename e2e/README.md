@@ -26,18 +26,18 @@ would silently test the build before it.
 
 ## Routes of the fixture
 
-| route                   | what it covers                                               |
-| ----------------------- | ------------------------------------------------------------ |
-| `/`                     | `getEnvAsync()` in a Server Component, plus a client read    |
-| `/client`               | the same client read after a client-side navigation          |
-| `/use-env`              | `getEnvAsync()` unwrapped with `use()` in a client component |
-| `/csp`                  | the inline script under the strict CSP of `src/proxy.ts`     |
-| `/unpublished`          | a space that was never sent to the browser                   |
-| `/render-guard`         | `getEnv()` during a build-time prerender                     |
-| `/render-guard/dynamic` | `getEnv()` during a dynamic render                           |
-| `/async-env`            | `space.getEnvAsync()` on an otherwise static route           |
-| `/api/env`              | synchronous `getEnv()` in a Route Handler                    |
-| `/api/broken`           | a value the schema rejects                                   |
+| route                   | what it covers                                            |
+| ----------------------- | --------------------------------------------------------- |
+| `/`                     | `getAsync()` in a Server Component, plus a client read    |
+| `/client`               | the same client read after a client-side navigation       |
+| `/use-env`              | `getAsync()` unwrapped with `use()` in a client component |
+| `/csp`                  | the inline script under the strict CSP of `src/proxy.ts`  |
+| `/unpublished`          | a space that was never sent to the browser                |
+| `/render-guard`         | `get()` during a build-time prerender                     |
+| `/render-guard/dynamic` | `get()` during a dynamic render                           |
+| `/async-env`            | `space.getAsync()` on an otherwise static route           |
+| `/api/env`              | synchronous `get()` in a Route Handler                    |
+| `/api/broken`           | a value the schema rejects                                |
 
 The routes under `(published)` sit below a layout that renders `<WithClientEnv />`;
 the ones under `(bare)` do not, which is what lets `/render-guard` be prerendered

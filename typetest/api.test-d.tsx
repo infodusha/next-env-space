@@ -37,19 +37,19 @@ const featureEnv = createEnvSpace(
   { name: "feature" },
 );
 
-const appName: string = publicEnv.getEnv("APP_NAME");
-const appVersion: string | undefined = publicEnv.getEnv("APP_VERSION");
-const timeout: number = publicEnv.getEnv("REQUEST_TIMEOUT_SECONDS");
-const featureEnabled: boolean = publicEnv.getEnv("FEATURE_ENABLED");
-const serviceUrls: Record<string, string> = publicEnv.getEnv("SERVICE_URLS");
+const appName: string = publicEnv.get("APP_NAME");
+const appVersion: string | undefined = publicEnv.get("APP_VERSION");
+const timeout: number = publicEnv.get("REQUEST_TIMEOUT_SECONDS");
+const featureEnabled: boolean = publicEnv.get("FEATURE_ENABLED");
+const serviceUrls: Record<string, string> = publicEnv.get("SERVICE_URLS");
 const nodeEnv: "production" | "development" | "test" =
-  featureEnv.getEnv("NODE_ENV");
-const all: InferEnv<typeof featureEnv.schema> = featureEnv.getAllEnv();
+  featureEnv.get("NODE_ENV");
+const all: InferEnv<typeof featureEnv.schema> = featureEnv.getAll();
 
 // @ts-expect-error unknown key
-publicEnv.getEnv("NOPE");
+publicEnv.get("NOPE");
 // @ts-expect-error wrong type
-const wrong: number = publicEnv.getEnv("APP_NAME");
+const wrong: number = publicEnv.get("APP_NAME");
 
 export function Layout() {
   return (
@@ -84,13 +84,13 @@ export {
 const sameShape: ClientEntry.CreateEnvSpace = createEnvSpaceRsc;
 const bothWays: ServerEntry.CreateEnvSpace = createEnvSpace as CreateEnvSpace;
 
-// getEnvAsync is now a method on the space itself
+// getAsync is now a method on the space itself
 async function methods() {
-  const name: string = await publicEnv.getEnvAsync("APP_NAME");
-  const everything = await featureEnv.getAllEnvAsync();
+  const name: string = await publicEnv.getAsync("APP_NAME");
+  const everything = await featureEnv.getAllAsync();
   const flag: boolean = everything.FLAG;
   // @ts-expect-error unknown key
-  await publicEnv.getEnvAsync("NOPE");
+  await publicEnv.getAsync("NOPE");
   return [name, flag, sameShape, bothWays] as const;
 }
 

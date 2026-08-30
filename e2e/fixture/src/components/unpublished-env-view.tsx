@@ -14,7 +14,7 @@ export function UnpublishedEnvView() {
 
   function read(): void {
     try {
-      unpublishedEnv.getEnv("UNPUBLISHED_VALUE");
+      unpublishedEnv.get("UNPUBLISHED_VALUE");
       setMessage("no error");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));

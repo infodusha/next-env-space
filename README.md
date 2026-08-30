@@ -4,7 +4,7 @@ Runtime environment variables for Next.js, validated with [zod](https://zod.dev)
 into isolated **spaces**.
 
 - values are read from `process.env` **at runtime**, never inlined at build time
-- one schema, one type — `getEnv("APP_NAME")` is fully typed
+- one schema, one type — `get("APP_NAME")` is fully typed
 - several spaces per app: ship one to the browser, keep another server-only
 - a guard that fails loudly when a value would be captured during a prerender
 
@@ -98,18 +98,18 @@ Do not reach for `'unsafe-inline'` to make the script run.
 import { publicEnv } from "@/env";
 
 // module scope, client components, route handlers, anywhere outside a render
-const appName = publicEnv.getEnv("APP_NAME"); // string
-const timeout = publicEnv.getEnv("REQUEST_TIMEOUT_SECONDS"); // number
+const appName = publicEnv.get("APP_NAME"); // string
+const timeout = publicEnv.get("REQUEST_TIMEOUT_SECONDS"); // number
 ```
 
-Inside a Server Component the value would be baked into the prerender, so `getEnv` throws
-there. Use `getEnvAsync` — it opts the render out of prerendering first:
+Inside a Server Component the value would be baked into the prerender, so `get` throws
+there. Use `getAsync` — it opts the render out of prerendering first:
 
 ```tsx
 import { publicEnv } from "@/env";
 
 export default async function Page() {
-  const appName = await publicEnv.getEnvAsync("APP_NAME");
+  const appName = await publicEnv.getAsync("APP_NAME");
   return <h1>{appName}</h1>;
 }
 ```
@@ -124,7 +124,7 @@ import { use } from "react";
 import { publicEnv } from "@/env";
 
 export function AppName() {
-  return <h1>{use(publicEnv.getEnvAsync("APP_NAME"))}</h1>;
+  return <h1>{use(publicEnv.getAsync("APP_NAME"))}</h1>;
 }
 ```
 
@@ -134,16 +134,16 @@ suspending on a promise the component created while rendering — which React re
 says so on the console.
 
 Without Cache Components that is every time, so the component never suspends and needs no
-`<Suspense>`. With them, `getEnvAsync` is a real boundary in a client component too, so it
+`<Suspense>`. With them, `getAsync` is a real boundary in a client component too, so it
 does — see below.
 
-`getEnvAsync` lives on the space itself, in the isomorphic entry point, even though
+`getAsync` lives on the space itself, in the isomorphic entry point, even though
 `connection()` only exists on the server. That works through the `react-server` export
 condition: the RSC layer resolves `next-env-space` to a build that can reach for
 `connection()`, every other layer gets one that only has `io()` — and never pulls
 `next/server` into the browser bundle. `io()` is a boundary in every layer, but only with
 Cache Components, so a Server Component that ends up on the isomorphic build without them
-has nothing to opt out with. `getEnvAsync` throws there rather than quietly leaving the
+has nothing to opt out with. `getAsync` throws there rather than quietly leaving the
 render prerenderable.
 
 ## Cache Components
@@ -166,7 +166,7 @@ compiles. A build where the flag never reaches the package — it was externalis
 example — reads as "off" and keeps `connection()`, which is correct in both modes, only
 less eager.
 
-With Cache Components on, both `getEnvAsync` and `<WithClientEnv />` become dynamic holes
+With Cache Components on, both `getAsync` and `<WithClientEnv />` become dynamic holes
 and need a `<Suspense>` boundary around them. That is a property of the mode rather than of
 `io()` — `connection()` stalls the prerender at exactly the same point, it just refuses to
 resolve for anything short of a real navigation:
@@ -186,10 +186,10 @@ the static shell and is rendered during `next build`, where a read still answers
 build machine's value: it then sits in the prerendered HTML and mismatches the runtime value
 on hydration.
 
-`getEnvAsync` is the way out of that, in a client component as much as in a Server one — its
+`getAsync` is the way out of that, in a client component as much as in a Server one — its
 `io()` turns the read into a hole of its own, so the value is produced per request and the
 build fails if no boundary encloses it. What has no such escape is the synchronous
-`getEnv()` and anything read at module scope: both answer during the prerender, and neither
+`get()` and anything read at module scope: both answer during the prerender, and neither
 guard sees it. Reading at module scope is fine in itself — the module is evaluated again in
 the server process, so it holds the runtime value — it is rendering that value into the
 static shell that captures it.
@@ -222,8 +222,8 @@ with its own type, so a missing or malformed variable names itself in the error.
 
 The returned space exposes:
 
-- `getEnv(key)` / `getAllEnv()` — synchronous, outside a Server Component render
-- `getEnvAsync(key)` / `getAllEnvAsync()` — inside a Server Component, opts the render out
+- `get(key)` / `getAll()` — synchronous, outside a Server Component render
+- `getAsync(key)` / `getAllAsync()` — inside a Server Component, opts the render out
   of prerendering first; in a client component, safe to unwrap with `use()`
 - `name`, `keys`, `schema`
 

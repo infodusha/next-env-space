@@ -4,7 +4,7 @@ import { featureEnv, publicEnv } from "@/env";
 
 /** Reads both public spaces the way a client component would. */
 export function PublicEnvView() {
-  const env = publicEnv.getAllEnv();
+  const env = publicEnv.getAll();
 
   return (
     <section data-testid="client-env">
@@ -20,7 +20,7 @@ export function PublicEnvView() {
       </p>
       <p data-testid="client-unsafe-value">{env.UNSAFE_VALUE}</p>
       <p data-testid="client-feature-label">
-        {featureEnv.getEnv("FEATURE_LABEL")}
+        {featureEnv.get("FEATURE_LABEL")}
       </p>
     </section>
   );

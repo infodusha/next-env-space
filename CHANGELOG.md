@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.0.0](https://github.com/infodusha/next-env-space/compare/v2.0.0...v3.0.0) (2026-08-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* rename UseClientEnv to ClientEnvProvider, WithClientEnv to ClientEnvScript
+* use standard schema
+
+### Features
+
+* InferEnv accepts a space, fix duplicate-name warning on hot reload ([f585b10](https://github.com/infodusha/next-env-space/commit/f585b1075836e460737ea33667814d84d2402a61))
+* rename UseClientEnv to ClientEnvProvider, WithClientEnv to ClientEnvScript ([3b46a03](https://github.com/infodusha/next-env-space/commit/3b46a031cbcdf5df34ae592fb47915da940a20e3))
+* use standard schema ([b9b311e](https://github.com/infodusha/next-env-space/commit/b9b311ea25326557b185b6260a952df3ce835c7b))
+
+
+### Bug Fixes
+
+* cleanup guards - no runtime checks needed ([fab14f4](https://github.com/infodusha/next-env-space/commit/fab14f46b8e63cfe3c515effdd99f3b27bfc157c))
+* do not publish sourcemaps ([fa966da](https://github.com/infodusha/next-env-space/commit/fa966daca532defc9c52485cdb9bc49e370f3558))
+
 ## [2.0.0](https://github.com/infodusha/next-env-space/compare/v1.0.3...v2.0.0) (2026-08-30)
 
 

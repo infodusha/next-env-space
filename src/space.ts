@@ -3,7 +3,7 @@ import * as react from "react";
 import { parseEnv } from "./parse.js";
 import { isProduction } from "./process-env.js";
 import { readRawEnv, type EnvRuntime } from "./raw-env.js";
-import type { EnvSchema, InferEnv } from "./schema.js";
+import type { EnvSchema, ParsedEnv } from "./schema.js";
 import { fulfilled, isFulfilled, rejected } from "./thenable.js";
 
 const defaultSpaceName = "default";
@@ -32,38 +32,62 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * time — use `getAsync` there. Throws as well on a key the schema has not
    * declared.
    */
-  get<TKey extends keyof TSchema>(key: TKey): InferEnv<TSchema>[TKey];
+  get<TKey extends keyof TSchema>(key: TKey): ParsedEnv<TSchema>[TKey];
   /** Reads the whole space at once, with the same rules as `get`. */
-  getAll(): InferEnv<TSchema>;
+  getAll(): ParsedEnv<TSchema>;
   /**
    * Reads a single variable inside a Server Component. Opts the render out of
    * prerendering first, so the value is always the one of the running server.
    */
   getAsync<TKey extends keyof TSchema>(
     key: TKey,
-  ): Promise<InferEnv<TSchema>[TKey]>;
+  ): Promise<ParsedEnv<TSchema>[TKey]>;
   /** Reads the whole space at once, with the same rules as `getAsync`. */
-  getAllAsync(): Promise<InferEnv<TSchema>>;
+  getAllAsync(): Promise<ParsedEnv<TSchema>>;
 }
 
 /**
- * Creates an env space: a group of environment variables read from
- * `process.env` at runtime, each validated with its own Standard Schema —
- * zod, valibot, arktype or any other library that implements the spec. The
- * whole space is parsed on the first read and cached for the lifetime of the
- * process.
- *
- * `schema` is a shape with one schema per key (`{ FOO: z.string() }`). Give
- * every space of the app its own `name` — it is the key the raw values are
- * published under on the client.
+ * The parsed values of a space, or of a shape, as one read-only object type.
  *
  * @example
- * export const publicEnv = createEnvSpace(
- *   { APP_NAME: z.string() },
- *   { name: "public" },
- * );
+ * type PublicEnv = InferEnv<typeof publicEnv>;
+ * type AppName = PublicEnv["APP_NAME"];
+ */
+export type InferEnv<TEnv extends EnvSchema | AnyEnvSpace> =
+  TEnv extends AnyEnvSpace
+    ? ParsedEnv<TEnv["schema"]>
+    : TEnv extends EnvSchema
+      ? ParsedEnv<TEnv>
+      : never;
+
+/** Any env space, whatever its shape — what `EnvSpace<TSchema>` narrows to. */
+interface AnyEnvSpace {
+  readonly [envSpaceBrand]: true;
+  readonly schema: EnvSchema;
+}
+
+/**
+ * The type of `createEnvSpace`. The documentation sits on the call signature,
+ * where the editor picks it up for the call itself.
  */
 export interface CreateEnvSpace {
+  /**
+   * Creates an env space: a group of environment variables read from
+   * `process.env` at runtime, each validated with its own Standard Schema —
+   * zod, valibot, arktype or any other library that implements the spec. The
+   * whole space is parsed on the first read and cached for the lifetime of the
+   * process.
+   *
+   * @param schema A shape with one schema per key: `{ FOO: z.string() }`.
+   * @param options `name` — the key the raw values are published under on the
+   * client. Give every space of the app its own.
+   *
+   * @example
+   * export const publicEnv = createEnvSpace(
+   *   { APP_NAME: z.string() },
+   *   { name: "public" },
+   * );
+   */
   <TSchema extends EnvSchema>(
     schema: TSchema,
     options?: EnvSpaceOptions,
@@ -89,9 +113,9 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     assertUniqueName(name, keys);
     takenSpaces.set(name, keys);
 
-    let cachedEnv: InferEnv<TSchema> | null = null;
+    let cachedEnv: ParsedEnv<TSchema> | null = null;
 
-    function readAllEnv(fromContext: boolean): InferEnv<TSchema> {
+    function readAllEnv(fromContext: boolean): ParsedEnv<TSchema> {
       cachedEnv ??= parseEnv(
         schema,
         readRawEnv(runtime, name, fromContext),
@@ -100,14 +124,14 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       return cachedEnv;
     }
 
-    function getAll(): InferEnv<TSchema> {
+    function getAll(): ParsedEnv<TSchema> {
       assertNotInRender(name, "getAll()");
       return readAllEnv(false);
     }
 
     function get<TKey extends keyof TSchema>(
       key: TKey,
-    ): InferEnv<TSchema>[TKey] {
+    ): ParsedEnv<TSchema>[TKey] {
       assertKnownKey(schema, name, key);
       assertNotInRender(name, `get('${String(key)}')`);
       return readAllEnv(false)[key];
@@ -117,7 +141,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
     function readAsync<TValue>(
       key: keyof TSchema | null,
-      pick: (env: InferEnv<TSchema>) => TValue,
+      pick: (env: ParsedEnv<TSchema>) => TValue,
     ): Promise<TValue> {
       const optedOut = runtime.optOutOfPrerender();
 
@@ -143,13 +167,13 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       }
     }
 
-    function getAllAsync(): Promise<InferEnv<TSchema>> {
+    function getAllAsync(): Promise<ParsedEnv<TSchema>> {
       return readAsync(null, (env) => env);
     }
 
     function getAsync<TKey extends keyof TSchema>(
       key: TKey,
-    ): Promise<InferEnv<TSchema>[TKey]> {
+    ): Promise<ParsedEnv<TSchema>[TKey]> {
       assertKnownKey(schema, name, key);
       return readAsync(key, (env) => env[key]);
     }
@@ -172,39 +196,36 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
 export function readEnvSpace<TSchema extends EnvSchema>(
   space: EnvSpace<TSchema>,
-): InferEnv<TSchema> {
+): ParsedEnv<TSchema> {
   const read = readers.get(space);
   if (read === undefined) {
     throw new Error(
       `Env space "${space.name}" was not created by createEnvSpace() of this package instance.`,
     );
   }
-  return read() as InferEnv<TSchema>;
+  return read() as ParsedEnv<TSchema>;
 }
 
 function assertUniqueName(name: string, keys: readonly string[]): void {
   const taken = takenSpaces.get(name);
-  if (taken === undefined) {
+  if (taken === undefined || sameKeys(taken, keys)) {
     return;
   }
 
-  if (isProduction() && !sameKeys(taken, keys)) {
-    throw new Error(
-      `Env space "${name}" is created twice with different keys. ` +
-        `The one that reaches the browser last replaces the other, so every read of that other one fails. ` +
-        `Pass a unique "name" option to createEnvSpace().`,
-    );
+  const message =
+    `Env space "${name}" is created twice with different keys. ` +
+    `The one that reaches the browser last replaces the other, so every read of that other one fails. ` +
+    `Pass a unique "name" option to createEnvSpace().`;
+
+  if (isProduction()) {
+    throw new Error(message);
   }
 
   if (warnedSpaces.has(name)) {
     return;
   }
   warnedSpaces.add(name);
-
-  console.warn(
-    `Env space "${name}" is created more than once. ` +
-      `Pass a unique "name" option to createEnvSpace() so the spaces do not overwrite each other on the client.`,
-  );
+  console.warn(message);
 }
 
 function sameKeys(taken: readonly string[], keys: readonly string[]): boolean {
@@ -244,7 +265,8 @@ function assertNotInRender(name: string, call: string): void {
 
   throw new Error(
     `${call} of the "${name}" env space is called while rendering, so its value can be captured at build time. ` +
-      `Use getAsync() instead, or read it at module scope.`,
+      `Use getAsync() instead, or move the read out of the render — a Route Handler, a Server Action, instrumentation.ts. ` +
+      `Inside a "use cache" function neither works: pass the value in as an argument.`,
   );
 }
 

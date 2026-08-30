@@ -1,5 +1,8 @@
 # next-env-space
 
+[![npm](https://img.shields.io/npm/v/next-env-space)](https://www.npmjs.com/package/next-env-space)
+[![ci](https://github.com/infodusha/next-env-space/actions/workflows/ci.yml/badge.svg)](https://github.com/infodusha/next-env-space/actions/workflows/ci.yml)
+
 Runtime environment variables for Next.js, validated with any
 [Standard Schema](https://standardschema.dev) library — zod, valibot, arktype and the rest —
 and grouped into isolated **spaces**.
@@ -10,15 +13,27 @@ and grouped into isolated **spaces**.
 - several spaces per app: ship one to the browser, keep another server-only
 - a guard that fails loudly when a value would be captured during a prerender
 
+## Why
+
+`NEXT_PUBLIC_*` variables are inlined into the bundle by `next build`, so one image serves
+one environment, and a value that changes means a rebuild. Libraries that validate `env` at
+build time — [t3-env](https://env.t3.gg) among them — inherit that for the client side; the
+ones that ship values at runtime tend to hand back an untyped `string | undefined`. This
+package does both: the values are read from `process.env` when the server runs, so one build
+goes to every environment, and each one is parsed by the schema you gave it, so `get()`
+returns a `number` where you declared one.
+
 ## Install
 
 ```sh
 npm i next-env-space
 ```
 
-`next` and `react` are peer dependencies. The schema library is yours to pick — every
-example below uses [zod](https://zod.dev), but any
-[Standard Schema](https://standardschema.dev) implementation works the same way.
+Needs Next.js 16.3 or later and React 19.2 or later, both peer dependencies. The package is
+ESM only.
+
+The schema library is yours to pick — every example below uses [zod](https://zod.dev), but
+any [Standard Schema](https://standardschema.dev) implementation works the same way.
 
 ## Define a space
 
@@ -58,6 +73,30 @@ export const serverEnv = createEnvSpace(
 The schema is always a shape with one schema per key. A single object schema around the keys —
 `z.object({ ... })`, `v.object({ ... })` — does not type-check: Standard Schema does not expose
 the keys an object declares, and every variable is parsed on its own so a bad one can name itself.
+
+### Anything that is not a string
+
+Every value arrives as `string | undefined`, so the schema is where it turns into something
+else — coercion, a default, a boolean, a parsed JSON document:
+
+```ts
+export const publicEnv = createEnvSpace(
+  {
+    PORT: z.coerce.number().default(3000),
+    DEBUG: z.stringbool().default(false),
+    SERVICE_URLS: z.preprocess(
+      (raw) => JSON.parse(raw as string) as unknown,
+      z.record(z.string(), z.url()),
+    ),
+  },
+  { name: "public" },
+);
+
+publicEnv.get("SERVICE_URLS"); // Record<string, string>
+```
+
+Schemas have to validate synchronously: the values are parsed on the spot, so a key with an
+async refinement throws on its first read.
 
 ## Send a space to the browser
 
@@ -204,6 +243,34 @@ export function AppName() {
 This is the only read `<UseClientEnv />` on its own can serve. Everything else in this
 section needs the space published with `<WithClientEnv />`.
 
+### Where each read works
+
+| where                                                  | `get()`                            | `getAsync()`                                                    |
+| ------------------------------------------------------ | ---------------------------------- | --------------------------------------------------------------- |
+| Server Component render, `generateMetadata`            | throws                             | works, opts the route out of prerendering                       |
+| Client Component render                                | works                              | works, unwrapped with `use()`                                   |
+| Client Component, outside the render (handler, effect) | works                              | works with `<WithClientEnv />`; throws with `<UseClientEnv />`  |
+| module scope of a client module                        | works                              | works with `<WithClientEnv />`; throws with `<UseClientEnv />`  |
+| module scope of a server module                        | works, runtime value               | do not `await` at module scope                                  |
+| Route Handler                                          | works                              | works                                                           |
+| Route Handler with `dynamic = "force-static"`          | **build-time value**, silently     | **build-time value**, silently                                  |
+| Server Action                                          | works                              | works                                                           |
+| `proxy.ts` (middleware)                                | works                              | works                                                           |
+| `instrumentation.ts` — `register()`                    | works                              | throws: Next has no request to attach to                        |
+| `instrumentation-client.ts`                            | works below `<WithClientEnv />`    | works below `<WithClientEnv />`; throws with `<UseClientEnv />` |
+| `generateStaticParams`                                 | build-time value — that is its job | throws: Next has no request to attach to                        |
+| inside a `"use cache"` function                        | throws                             | **build-time value**, cached                                    |
+
+`instrumentation-client.ts` runs once, as the first page loads, before any component: it
+sees a space only if that page writes the env script of `<WithClientEnv />` — a root layout
+does — and never the context of `<UseClientEnv />`, which has not rendered yet.
+
+The two bold rows are the ones no guard can catch. A `force-static` Route Handler is
+prerendered once at build, and `"use cache"` caches whatever its body returned the first
+time it ran — during `next build`. Neither read throws there, so both bake the value of
+the build machine in. Read the value outside and pass it in as an argument, or drop the
+static mode for that route.
+
 ## Cache Components
 
 With `cacheComponents` on, `getAsync`, `<WithClientEnv />` and `<UseClientEnv />` all become
@@ -244,6 +311,47 @@ client. Spaces are independent: each has its own schema, its own cache and its o
 
 `<UseClientEnv />` nests instead of repeating, and merges with the provider above it.
 
+## Recipes
+
+### Fail at boot, not on the first request
+
+A space is parsed on its first read, so a misconfigured variable surfaces when the first
+request happens to need it. Read every space once as the server starts and a bad
+deployment dies right there:
+
+```ts
+// instrumentation.ts
+import { publicEnv } from "@/env";
+import { serverEnv } from "@/env.server";
+
+export function register() {
+  publicEnv.getAll();
+  serverEnv.getAll();
+}
+```
+
+`register()` runs outside any request, so this is `getAll()` — `getAllAsync()` throws there.
+
+### One build, many environments
+
+Nothing in the package needs the real values at `next build`: the publishers and `getAsync`
+opt out of prerendering, so a `Dockerfile` can build the app without a single variable set
+and let `docker run -e` or the orchestrator supply them to `next start`. The exceptions are
+the reads that run at build time by nature — module scope of a module the build evaluates,
+`generateStaticParams`, the bold rows of the table above. Those see whatever the build
+machine has, and a required key that is missing there fails the build, which is the right
+call: the value would have been baked in otherwise. `output: "standalone"` changes nothing,
+`node server.js` reads the same `process.env`.
+
+### Testing
+
+The space caches its parsed values for the lifetime of the process and reads `process.env`
+when a module first touches it. In a unit test, set the variables first and import the module
+under test afterwards — `vi.resetModules()` between cases gives every set of values a fresh
+space. Under a browser-like environment (`jsdom`, `happy-dom`) `window` exists, so the space
+looks for the values `<WithClientEnv />` publishes and finds none: run the tests of
+server-side code in the `node` environment.
+
 ## API
 
 ### `createEnvSpace(schema, options?): EnvSpace`
@@ -262,6 +370,20 @@ The returned space exposes:
 - `getAsync(key)` / `getAllAsync()` — inside a Server Component, opts the render out
   of prerendering first; in a client component, safe to unwrap with `use()`
 - `name`, `keys`, `schema`
+
+### `InferEnv<typeof space>`
+
+The parsed values of a space as one read-only object type, for the places that carry the
+whole environment around rather than one key:
+
+```ts
+import type { InferEnv } from "next-env-space";
+
+type PublicEnv = InferEnv<typeof publicEnv>;
+type Timeout = PublicEnv["REQUEST_TIMEOUT_SECONDS"]; // number
+```
+
+The shape itself works as well — `InferEnv<typeof publicEnv.schema>` names the same type.
 
 ### `next-env-space/server`
 
@@ -283,14 +405,10 @@ build.
   names every bad value at once, not one per restart.
 - A key the space does not declare throws in `get()` and `getAsync()` rather than reading as
   `undefined`.
-- Schemas have to validate synchronously: the values are parsed on the spot, so a key with
-  an async refinement throws on its first read.
-- Two spaces under one `name` overwrite each other on the client. That warns, and in
-  production, where a rebuild rather than a hot reload is what re-evaluates a module, it
-  throws as soon as their keys differ.
+- Two spaces under one `name` overwrite each other on the client. That is harmless while
+  they declare the same keys — a hot reload re-creates a space this way — and an error as
+  soon as they do not: a warning in development, a thrown error in production.
 - `WithClientEnv` parses the space on the server before serialising it, so a missing or
   malformed value fails there rather than in the browser at the first read.
 - Do not use the `NEXT_PUBLIC_` prefix: those are inlined at build time, which is exactly
   what this package avoids.
-- Values must be `string | undefined` on the way in — use `z.coerce.*`, `z.stringbool()`,
-  `z.preprocess()`, or what your library offers for the same, for anything else.

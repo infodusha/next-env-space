@@ -6,4 +6,9 @@ declare interface Window {
   useEnvRenders?: number;
   /** How often `<ProvidedEnvView />` rendered. */
   providedEnvRenders?: number;
+  /** What both reads returned inside `instrumentation-client.ts` on this page. */
+  instrumentationClientReads?: {
+    readonly sync: string;
+    readonly async: string;
+  };
 }

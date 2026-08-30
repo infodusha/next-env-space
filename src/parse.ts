@@ -1,7 +1,7 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { RawEnv } from "./global.js";
-import type { EnvSchema, InferEnv } from "./schema.js";
+import type { EnvSchema, ParsedEnv } from "./schema.js";
 
 interface InvalidValue {
   readonly key: string;
@@ -12,7 +12,7 @@ export function parseEnv<TSchema extends EnvSchema>(
   schema: TSchema,
   rawEnv: RawEnv,
   name: string,
-): InferEnv<TSchema> {
+): ParsedEnv<TSchema> {
   const env: Record<string, unknown> = {};
   const invalid: InvalidValue[] = [];
 
@@ -29,7 +29,7 @@ export function parseEnv<TSchema extends EnvSchema>(
     throw new Error(invalidMessage(name, invalid));
   }
 
-  return Object.freeze(env) as InferEnv<TSchema>;
+  return Object.freeze(env) as ParsedEnv<TSchema>;
 }
 
 function validate(

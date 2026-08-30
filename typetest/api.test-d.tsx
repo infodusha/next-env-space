@@ -61,7 +61,15 @@ const nodeEnv: "production" | "development" | "test" =
 const flag: boolean = featureEnv.get("FLAG");
 const port: number = mixedEnv.get("PORT");
 const host: string = mixedEnv.get("HOST");
-const all: InferEnv<typeof featureEnv.schema> = featureEnv.getAll();
+const all: InferEnv<typeof featureEnv> = featureEnv.getAll();
+// InferEnv takes the space itself, or its shape — both name the same type.
+const allFromShape: InferEnv<typeof featureEnv.schema> = all;
+type PublicEnv = InferEnv<typeof publicEnv>;
+const oneOfAll: PublicEnv["REQUEST_TIMEOUT_SECONDS"] = timeout;
+// @ts-expect-error InferEnv picks the type of the key, not string
+const notAString: string = all.FLAG;
+// @ts-expect-error neither a space nor a shape
+type NotAnEnv = InferEnv<string>;
 
 // @ts-expect-error a parsed space is read-only
 all.FLAG = false;
@@ -137,8 +145,12 @@ export {
   port,
   host,
   all,
+  allFromShape,
+  oneOfAll,
+  notAString,
   wrong,
 };
+export type { NotAnEnv };
 
 // Both entry points must expose exactly the same public type, otherwise the
 // `react-server` condition would change the API depending on the layer.

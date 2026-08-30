@@ -65,6 +65,7 @@ would silently test the build before it.
 | `/provided-late`        | the same space read after the render, which has to fail   |
 | `/soft-nav`             | a client-side navigation into the layouts that publish    |
 | `/guards`               | every misuse the API rejects, and how it words it         |
+| `/contexts/*`           | the rows of the README table "Where each read works"      |
 
 The routes under `(published)` sit below a layout that renders `<WithClientEnv />`;
 the ones under `(bare)` do not, which is what lets `/render-guard` be prerendered
@@ -72,6 +73,13 @@ at build time, `/async-env` prove that the prerender opt-out really ran, and
 `/soft-nav` reach that layout for the first time from the browser. The ones under
 `(provided)` sit below two nested `<UseClientEnv />` instead, so no inline script
 reaches them at all.
+
+`/contexts/*` and `/api/contexts/*` each put both reads into one context of the
+README table — `generateMetadata`, `generateStaticParams`, a `force-static` Route
+Handler, `instrumentation.ts`, `src/proxy.ts` — and report `ok:<value>` or
+`err:<message>` instead of throwing, so the spec can assert on the outcome.
+`src/instrumentation-client.ts` does the same in the browser and parks the result
+on `window`, which the spec reads on a published, a provided and a bare page.
 
 ## Routes of the cache fixture
 
@@ -81,3 +89,5 @@ of the segment configs the mode rejects, and the specs assert per route what
 made it into the static shell and what streams in at request time —
 `/client` deliberately bakes a synchronous client read into its shell to pin
 down the documented capture-then-heal behavior.
+`/contexts/use-cache` reads inside a `"use cache"` function, where `getAsync()`
+captures the build value — the row of the README table only this fixture can test.

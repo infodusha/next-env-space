@@ -1,10 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { readBoth } from "@/contexts";
+
 /**
  * A strict CSP on /csp only: the env script has to carry the nonce to run at
- * all, so the client read on that page fails without it.
+ * all, so the client read on that page fails without it. /contexts/proxy is
+ * answered here directly, to show both reads work in the proxy itself.
  */
-export function proxy(request: NextRequest): NextResponse {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  if (request.nextUrl.pathname === "/contexts/proxy") {
+    return NextResponse.json(await readBoth());
+  }
+
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = [
     "default-src 'self'",
@@ -24,5 +31,5 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/csp"],
+  matcher: ["/csp", "/contexts/proxy"],
 };

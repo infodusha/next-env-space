@@ -1,7 +1,6 @@
 import "server-only";
 import { ClientEnv } from "./client.js";
 import { optOutOfPrerender } from "./dynamic.js";
-import { readProcessEnv } from "./global.js";
 import type { EnvSchema } from "./schema.js";
 import { readEnvSpace, type EnvSpace } from "./space.js";
 
@@ -16,9 +15,8 @@ export async function WithClientEnv<TSchema extends EnvSchema>({
 }: WithClientEnvProps<TSchema>) {
   await optOutOfPrerender();
   readEnvSpace(space);
-  const processEnv = readProcessEnv();
   const rawEnv = Object.fromEntries(
-    space.keys.map((key) => [key, processEnv[key]]),
+    space.keys.map((key) => [key, process.env[key]]),
   );
   return <ClientEnv name={space.name} rawEnv={rawEnv} nonce={nonce} />;
 }

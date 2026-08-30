@@ -1,7 +1,7 @@
 import * as react from "react";
 import type * as z from "zod";
 
-import { envSpacesKey, readProcessEnv, type RawEnv } from "./global.js";
+import { envSpacesKey, type RawEnv } from "./global.js";
 import { parseEnv } from "./parse.js";
 import {
   toEnvShape,
@@ -172,7 +172,7 @@ export function readEnvSpace<TSchema extends EnvSchema>(
 
 function readRawEnv(name: string): RawEnv {
   if (typeof window === "undefined") {
-    return readProcessEnv();
+    return process.env;
   }
 
   const rawEnv = window[envSpacesKey]?.[name];

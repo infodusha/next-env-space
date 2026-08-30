@@ -7,8 +7,3 @@ declare global {
     [envSpacesKey]?: Record<string, RawEnv | undefined>;
   }
 }
-
-export function readProcessEnv(): RawEnv {
-  const { process } = globalThis as unknown as { process?: { env?: RawEnv } };
-  return process?.env ?? {};
-}

@@ -1,0 +1,11 @@
+{
+  // The Playwright harness. The fixture app has its own tsconfig, and `next
+  // build` typechecks it.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "types": ["node"]
+  },
+  "include": ["globals.d.ts", "*.ts", "tests", "../playwright.config.ts"]
+}

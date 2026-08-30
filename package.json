@@ -50,19 +50,23 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p e2e/tsconfig.json",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "prepublishOnly": "npm run clean && npm run build",
     "test": "tsc -p tsconfig.typetest.json",
+    "test:e2e": "pnpm run build && playwright test",
+    "test:e2e:ui": "pnpm run build && playwright test --ui",
     "prepare": "husky"
   },
   "dependencies": {
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "husky": "^9.1.7",
     "lint-staged": "^17.4.1",

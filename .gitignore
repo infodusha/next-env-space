@@ -1,2 +1,7 @@
 node_modules/
 dist/
+.next/
+test-results/
+playwright-report/
+blob-report/
+.playwright/

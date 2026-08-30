@@ -21,8 +21,21 @@
   },
   "rules": {
     "react/react-in-jsx-scope": "off",
-    "import/no-unassigned-import": ["error", { "allow": ["server-only"] }],
+    "import/no-unassigned-import": [
+      "error",
+      {
+        "allow": ["server-only"]
+      }
+    ],
     "eslint/max-lines-per-function": "off"
   },
-  "ignorePatterns": ["dist"]
+  "ignorePatterns": ["dist", "**/.next", "**/next-env.d.ts"],
+  "overrides": [
+    {
+      "files": ["e2e/**"],
+      "rules": {
+        "eslint/no-underscore-dangle": "off"
+      }
+    }
+  ]
 }

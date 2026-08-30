@@ -128,48 +128,10 @@ export function AppName() {
 }
 ```
 
-The promise is the same one on every render of the same key, and comes back already settled
-wherever there was nothing to wait for. `use()` then unwraps it on the spot, rather than
-suspending on a promise the component created while rendering — which React refuses, and
-says so on the console.
-
-Without Cache Components that is every time, so the component never suspends and needs no
-`<Suspense>`. With them, `getAsync` is a real boundary in a client component too, so it
-does — see below.
-
-`getAsync` lives on the space itself, in the isomorphic entry point, even though
-`connection()` only exists on the server. That works through the `react-server` export
-condition: the RSC layer resolves `next-env-space` to a build that can reach for
-`connection()`, every other layer gets one that only has `io()` — and never pulls
-`next/server` into the browser bundle. `io()` is a boundary in every layer, but only with
-Cache Components, so a Server Component that ends up on the isomorphic build without them
-has nothing to opt out with. `getAsync` throws there rather than quietly leaving the
-render prerenderable.
-
 ## Cache Components
 
-Which API opts the render out is decided per build:
-
-| `cacheComponents` | call           | effect                                                           |
-| ----------------- | -------------- | ---------------------------------------------------------------- |
-| `true`            | `io()`         | a dynamic hole in an otherwise static shell, still prefetchable  |
-| `false`           | `connection()` | the route waits for a real request, which also blocks prefetches |
-
-`io()` suspends like any other asynchronous call, so the shell around the read stays static
-and the code after it can be prefetched and wrapped in `"use cache"` — which is why Next
-prefers it. It only creates a dynamic boundary when Cache Components are on, though: without
-them it resolves immediately during static generation and the value ends up in the build
-output, so the package falls back to `connection()` there.
-
-The detection reads the `__NEXT_CACHE_COMPONENTS` flag Next inlines into every module it
-compiles. A build where the flag never reaches the package — it was externalised, for
-example — reads as "off" and keeps `connection()`, which is correct in both modes, only
-less eager.
-
-With Cache Components on, both `getAsync` and `<WithClientEnv />` become dynamic holes
-and need a `<Suspense>` boundary around them. That is a property of the mode rather than of
-`io()` — `connection()` stalls the prerender at exactly the same point, it just refuses to
-resolve for anything short of a real navigation:
+With `cacheComponents` on, both `getAsync` and `<WithClientEnv />` become dynamic holes and
+need a `<Suspense>` boundary around them:
 
 ```tsx
 <body>
@@ -186,17 +148,12 @@ the static shell and is rendered during `next build`, where a read still answers
 build machine's value: it then sits in the prerendered HTML and mismatches the runtime value
 on hydration.
 
-`getAsync` is the way out of that, in a client component as much as in a Server one — its
-`io()` turns the read into a hole of its own, so the value is produced per request and the
-build fails if no boundary encloses it. What has no such escape is the synchronous
-`get()` and anything read at module scope: both answer during the prerender, and neither
-guard sees it. Reading at module scope is fine in itself — the module is evaluated again in
-the server process, so it holds the runtime value — it is rendering that value into the
-static shell that captures it.
-
-This is also why `WithClientEnv` does not open a boundary of its own. Without one the build
-fails and names the route, which is the moment to place the boundary correctly; with one the
-build would pass and bake the values instead.
+`getAsync` is the way out of that, in a client component as much as in a Server one — the
+value is produced per request and the build fails if no boundary encloses it. What has no
+such escape is the synchronous `get()` and anything read at module scope: both answer during
+the prerender, and neither guard sees it. Reading at module scope is fine in itself — the
+module is evaluated again in the server process, so it holds the runtime value — it is
+rendering that value into the static shell that captures it.
 
 ## Several spaces
 

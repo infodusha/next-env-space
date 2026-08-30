@@ -54,6 +54,10 @@ Render `WithClientEnv` once per space, in a layout above the client components t
 It serialises the raw values into a `<script>` tag, so **everything in that space becomes
 public**. Keep secrets in a separate space that is never rendered.
 
+It has to sit **above** the components that read it, not merely before them: a layout that a
+client-side navigation mounts has no document left to write a script into, and the values
+reach the browser as `WithClientEnv` itself renders there.
+
 There is a second publisher, `UseClientEnv`, that carries the space in React context instead
 of a script — [see below](#without-the-inline-script) for what that trades away.
 
@@ -241,8 +245,9 @@ The returned space exposes:
 ### `next-env-space/server`
 
 - `<WithClientEnv space={space} />` — ships one space to the browser in an inline
-  `<script>`, before any client module is evaluated. Takes an optional `nonce` for CSP.
-  Serves every read, `get()` included
+  `<script>`, before any client module is evaluated, or from the browser itself when a
+  client-side navigation is what mounts it. Takes an optional `nonce` for CSP. Serves every
+  read, `get()` included
 - `<UseClientEnv space={space}>{children}</UseClientEnv>` — ships the same space through
   React context. No inline script and no nonce, but only `getAsync()` / `getAllAsync()`
   can read it, and only from a component below it
@@ -254,6 +259,13 @@ build.
 
 - The whole space is parsed on first read and cached for the lifetime of the process, so a
   bad value fails fast rather than at the call site that happens to need it.
+- A key the space does not declare throws in `get()` and `getAsync()` rather than reading as
+  `undefined`.
+- A schema that is not a shape of zod types — a bare `z.record()`, a `z.string` that was
+  never called — is rejected by `createEnvSpace()` itself, not by the first read of it.
+- Two spaces under one `name` overwrite each other on the client. That warns, and in
+  production, where a rebuild rather than a hot reload is what re-evaluates a module, it
+  throws as soon as their keys differ.
 - `WithClientEnv` parses the space on the server before serialising it, so a missing or
   malformed value fails there rather than in the browser at the first read.
 - Do not use the `NEXT_PUBLIC_` prefix: those are inlined at build time, which is exactly

@@ -38,6 +38,12 @@
   "ignorePatterns": ["dist", "**/.next", "**/next-env.d.ts"],
   "overrides": [
     {
+      "files": ["src/process-env.ts"],
+      "rules": {
+        "unicorn/no-typeof-undefined": "off"
+      }
+    },
+    {
       "files": ["e2e/**"],
       "rules": {
         "eslint/no-underscore-dangle": "off"

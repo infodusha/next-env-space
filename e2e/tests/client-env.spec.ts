@@ -48,6 +48,29 @@ test.describe("a space that was shipped to the browser", () => {
     expect(await countEnvScripts(page)).toBe(before);
   });
 
+  test("reaches a layout that only a client-side navigation mounts", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    await page.goto("/soft-nav");
+    expect(await page.evaluate(() => window.__ENV_SPACES__)).toBeUndefined();
+
+    // No HTML is inserted on a navigation, so the values have to reach the
+    // browser as the publisher renders there.
+    await page.getByRole("link", { name: "to client page" }).click();
+    await expect(page).toHaveURL("/client");
+
+    await expect(page.getByTestId("client-app-name")).toHaveText(
+      runtimeEnv.APP_NAME,
+    );
+    await expect(page.getByTestId("client-feature-label")).toHaveText(
+      runtimeEnv.FEATURE_LABEL,
+    );
+    expect(errors).toEqual([]);
+  });
+
   test("hydrates without a mismatch", async ({ page }) => {
     const errors: string[] = [];
     page.on("console", (message) => {

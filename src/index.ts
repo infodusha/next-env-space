@@ -1,7 +1,7 @@
 import { io } from "next/cache";
 
-import { cacheComponentsEnabled } from "./cache-components.js";
 import { readContextRawEnv } from "./context.js";
+import { cacheComponentsEnabled } from "./process-env.js";
 import { createEnvSpaceWith, type CreateEnvSpace } from "./space.js";
 
 export * from "./types.js";

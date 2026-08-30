@@ -17,6 +17,8 @@ interface ClientEnvProps {
 export function ClientEnv({ name, rawEnv, nonce }: ClientEnvProps) {
   const hasFlushed = useRef(false);
 
+  publishToWindow(name, rawEnv);
+
   useServerInsertedHTML(() => {
     if (hasFlushed.current) {
       return null;
@@ -54,6 +56,19 @@ export function ClientEnvProvider({
   );
 
   return <EnvContext value={spaces}>{children}</EnvContext>;
+}
+
+function publishToWindow(name: string, rawEnv: RawEnv): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const spaces = window[envSpacesKey];
+  if (spaces?.[name] !== undefined) {
+    return;
+  }
+
+  window[envSpacesKey] = { ...spaces, [name]: rawEnv };
 }
 
 function createEnvScript(name: string, rawEnv: RawEnv): string {

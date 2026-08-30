@@ -1,8 +1,9 @@
 import * as react from "react";
 import type * as z from "zod";
 
-import { envSpacesKey, type RawEnv } from "./global.js";
 import { parseEnv } from "./parse.js";
+import { isProduction } from "./process-env.js";
+import { readRawEnv, type EnvRuntime } from "./raw-env.js";
 import {
   toEnvShape,
   type EnvSchema,
@@ -28,9 +29,11 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
   readonly keys: readonly (keyof TSchema & string)[];
   readonly schema: TSchema;
   /**
-   * Reads a single variable. Safe at module scope, in client components and in
-   * server code that already opted out of prerendering. Throws when called
-   * while a Server Component renders — use `getAsync` there.
+   * Reads a single variable. Safe at module scope, in client components, in
+   * Route Handlers and in Server Actions. Throws inside a Server Component
+   * render, a dynamic one included, where the value could be captured at build
+   * time — use `getAsync` there. Throws as well on a key the schema has not
+   * declared.
    */
   get<TKey extends keyof TSchema>(key: TKey): InferEnv<TSchema>[TKey];
   /** Reads the whole space at once, with the same rules as `get`. */
@@ -57,13 +60,7 @@ export interface CreateEnvSpace {
   ): EnvSpace<TSchema>;
 }
 
-export interface EnvRuntime {
-  readonly optOutOfPrerender: () => Promise<void>;
-  readonly optsOutInReactServer: boolean;
-  readonly readContextRawEnv: ((name: string) => RawEnv | undefined) | null;
-}
-
-const takenNames = new Set<string>();
+const takenSpaces = new Map<string, readonly string[]>();
 
 const readers = new WeakMap<object, () => unknown>();
 
@@ -72,17 +69,12 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     schema: EnvSchemaInput<TSchema>,
     options: EnvSpaceOptions = {},
   ): EnvSpace<TSchema> {
-    const shape = toEnvShape(schema);
     const name = options.name ?? defaultSpaceName;
+    const shape = toEnvShape(schema, name);
     const keys = Object.keys(shape) as (keyof TSchema & string)[];
 
-    if (takenNames.has(name)) {
-      console.warn(
-        `Env space "${name}" is created more than once. ` +
-          `Pass a unique "name" option to createEnvSpace() so the spaces do not overwrite each other on the client.`,
-      );
-    }
-    takenNames.add(name);
+    assertUniqueName(name, keys);
+    takenSpaces.set(name, keys);
 
     let cachedEnv: InferEnv<TSchema> | null = null;
 
@@ -99,6 +91,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     function get<TKey extends keyof TSchema>(
       key: TKey,
     ): InferEnv<TSchema>[TKey] {
+      assertKnownKey(shape, name, key);
       assertNotInRender(name, `get('${String(key)}')`);
       return readAllEnv(false)[key];
     }
@@ -140,6 +133,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     function getAsync<TKey extends keyof TSchema>(
       key: TKey,
     ): Promise<InferEnv<TSchema>[TKey]> {
+      assertKnownKey(shape, name, key);
       return readAsync(key, (env) => env[key]);
     }
 
@@ -162,6 +156,12 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 export function readEnvSpace<TSchema extends EnvSchema>(
   space: EnvSpace<TSchema>,
 ): InferEnv<TSchema> {
+  if (!isEnvSpaceLike(space)) {
+    throw new Error(
+      `The "space" prop needs an env space created by createEnvSpace().`,
+    );
+  }
+
   const read = readers.get(space);
   if (read === undefined) {
     throw new Error(
@@ -171,50 +171,56 @@ export function readEnvSpace<TSchema extends EnvSchema>(
   return read() as InferEnv<TSchema>;
 }
 
-function readRawEnv(
-  runtime: EnvRuntime,
-  name: string,
-  fromContext: boolean,
-): RawEnv {
-  if (typeof window === "undefined") {
-    return process.env;
-  }
-
-  const published = window[envSpacesKey]?.[name];
-  if (published !== undefined) {
-    return published;
-  }
-
-  const provided = fromContext ? readProvidedEnv(runtime, name) : undefined;
-  if (provided !== undefined) {
-    return provided;
-  }
-
-  throw new Error(
-    `Env space "${name}" is missing on the client. ` +
-      `Render <WithClientEnv space={...} /> or <UseClientEnv space={...}> from ` +
-      `"next-env-space/server" above the components that read it.`,
+function isEnvSpaceLike(space: unknown): boolean {
+  return (
+    typeof space === "object" &&
+    space !== null &&
+    typeof (space as { name?: unknown }).name === "string"
   );
 }
 
-function readProvidedEnv(
-  runtime: EnvRuntime,
-  name: string,
-): RawEnv | undefined {
-  const read = runtime.readContextRawEnv;
-  if (read === null) {
-    return undefined;
+function assertUniqueName(name: string, keys: readonly string[]): void {
+  const taken = takenSpaces.get(name);
+  if (taken === undefined) {
+    return;
   }
 
-  try {
-    return read(name);
-  } catch {
+  if (isProduction() && !sameKeys(taken, keys)) {
     throw new Error(
-      `getAsync() of the "${name}" env space was called outside of a render, ` +
-        `where the <UseClientEnv> context cannot be read. Publish the space with ` +
-        `<WithClientEnv space={...} /> instead — it lands before any component runs.`,
+      `Env space "${name}" is created twice with different keys. ` +
+        `The one that reaches the browser last replaces the other, so every read of that other one fails. ` +
+        `Pass a unique "name" option to createEnvSpace().`,
     );
   }
+
+  console.warn(
+    `Env space "${name}" is created more than once. ` +
+      `Pass a unique "name" option to createEnvSpace() so the spaces do not overwrite each other on the client.`,
+  );
+}
+
+function sameKeys(taken: readonly string[], keys: readonly string[]): boolean {
+  return (
+    taken.length === keys.length && keys.every((key) => taken.includes(key))
+  );
+}
+
+function assertKnownKey(
+  shape: EnvSchema,
+  name: string,
+  key: PropertyKey,
+): void {
+  if (Object.hasOwn(shape, key)) {
+    return;
+  }
+
+  const known = Object.keys(shape);
+  throw new Error(
+    `Key "${String(key)}" is not in the "${name}" env space. ` +
+      (known.length === 0
+        ? "The space has no keys."
+        : `It has ${known.join(", ")}.`),
+  );
 }
 
 function isServerRender(): boolean {

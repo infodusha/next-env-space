@@ -14,7 +14,6 @@ import { fixtureDir } from "../paths.js";
  */
 const guardMessage =
   "is called while rendering, so its value can be captured at build time";
-const noRequestMessage = "outside a request scope";
 
 const appDir = path.join(fixtureDir, ".next", "server", "app");
 
@@ -66,15 +65,13 @@ test.describe("a force-static Route Handler", () => {
 });
 
 test.describe("instrumentation.ts", () => {
-  test("get() reads the runtime value, getAsync() has no request", async ({
-    request,
-  }) => {
+  test("both reads answer with the runtime value", async ({ request }) => {
     const response = await request.get("/api/contexts/instrumentation");
-    const reads = (await response.json()) as { sync: string; async: string };
 
-    expect(reads.sync).toBe(`ok:${runtimeEnv.APP_NAME}`);
-    expect(reads.async).toMatch(/^err:/u);
-    expect(reads.async).toContain(noRequestMessage);
+    expect(await response.json()).toEqual({
+      sync: `ok:${runtimeEnv.APP_NAME}`,
+      async: `ok:${runtimeEnv.APP_NAME}`,
+    });
   });
 });
 

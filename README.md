@@ -253,12 +253,12 @@ In the table, _the script_ is `<ClientEnvScript />` and _the provider_ is `<Clie
 | Client Component render                                | ⚙️ works with the script           | ⚙️ works with the provider or the script, unwrapped with `use()` |
 | Client Component, outside the render (handler, effect) | ⚙️ works with the script           | ⚙️ works with the script                                         |
 | module scope of a client module                        | ⚙️ works with the script           | ⚙️ works with the script                                         |
-| module scope of a server module                        | ✅ works                           | 🚫 do not `await` at module scope                                |
+| module scope of a server module                        | ✅ works                           | ✅ works                                                         |
 | Route Handler                                          | ✅ works                           | ✅ works                                                         |
 | Route Handler with `dynamic = "force-static"`          | ⚠️ **build-time value**, silently  | ⚠️ **build-time value**, silently                                |
 | Server Action                                          | ✅ works                           | ✅ works                                                         |
 | `proxy.ts` (middleware)                                | ✅ works                           | ✅ works                                                         |
-| `instrumentation.ts` — `register()`                    | ✅ works                           | ❌ throws: Next has no request to attach to                      |
+| `instrumentation.ts` — `register()`                    | ✅ works                           | ✅ works                                                         |
 | `instrumentation-client.ts`                            | ⚙️ works with the script           | ⚙️ works with the script                                         |
 | `generateStaticParams`                                 | build-time value — that is its job | ❌ throws: Next has no request to attach to                      |
 | inside a `"use cache"` function                        | ❌ throws                          | ⚠️ **build-time value**, cached                                  |
@@ -267,12 +267,13 @@ In the table, _the script_ is `<ClientEnvScript />` and _the provider_ is `<Clie
 sees a space only if that page writes the env script of `<ClientEnvScript />` — a root layout
 does — and never the context of `<ClientEnvProvider />`, which has not rendered yet.
 
-The 🚫 cell is neither ❌ nor ⚠️ because the outcome depends on when the module happens to
-be evaluated first. Inside a request the `await` resolves with the runtime value — which the
-synchronous `get()` in the next column already gives, without the gamble. During the build,
-or anywhere without a request, the opt-out has nothing to attach to and rejects — and a
-module whose top-level `await` rejects stays broken for every later import of it. Nothing to
-gain when it works, a poisoned module when it does not: use `get()`.
+Where Next has no request to attach to, it has no prerender either — nothing the value
+could leak into — so `getAsync()` skips the opt-out and answers with exactly what `get()`
+reads in the same spot: the build machine's values in a module the build evaluates, the
+runtime ones once the server runs. That is what makes the `register()` row and an `await`
+at module scope safe — and also pointless, since `get()` is the same value without the
+promise. `generateStaticParams` is the exception Next itself refuses: it runs at build time
+by design, so a read that promises the runtime value has no honest answer there.
 
 The two bold rows are the ones no guard can catch. A `force-static` Route Handler is
 prerendered once at build, and `"use cache"` caches whatever its body returned the first
@@ -339,7 +340,8 @@ export function register() {
 }
 ```
 
-`register()` runs outside any request, so this is `getAll()` — `getAllAsync()` throws there.
+`register()` runs outside any request; `getAllAsync()` answers there too, with the same
+values — there is just nothing to `await`, so the synchronous read says it straighter.
 
 ### One build, many environments
 

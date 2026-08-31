@@ -3,6 +3,7 @@ import * as react from "react";
 import { parseEnv } from "./parse.js";
 import { isProduction } from "./process-env.js";
 import { readRawEnv, type EnvRuntime } from "./raw-env.js";
+import { isMissingRequestScope } from "./request-scope.js";
 import type { EnvSchema, ParsedEnv } from "./schema.js";
 import { fulfilled, isFulfilled, rejected } from "./thenable.js";
 
@@ -38,6 +39,9 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
   /**
    * Reads a single variable inside a Server Component. Opts the render out of
    * prerendering first, so the value is always the one of the running server.
+   * Where Next has no request to attach to — module scope of a server module,
+   * `register()` in instrumentation.ts — there is no prerender either, so it
+   * resolves with what the synchronous `get` reads there.
    */
   getAsync<TKey extends keyof TSchema>(
     key: TKey,
@@ -143,7 +147,15 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       key: keyof TSchema | null,
       pick: (env: ParsedEnv<TSchema>) => TValue,
     ): Promise<TValue> {
-      const optedOut = runtime.optOutOfPrerender();
+      let optedOut: Promise<void>;
+      try {
+        optedOut = runtime.optOutOfPrerender();
+      } catch (error) {
+        if (!isMissingRequestScope(error)) {
+          throw error;
+        }
+        optedOut = fulfilled();
+      }
 
       if (!isFulfilled(optedOut)) {
         return optedOut.then(() => {

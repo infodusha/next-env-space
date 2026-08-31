@@ -1,4 +1,7 @@
-import { moduleScopeAppName } from "@/module-scope-env";
+import {
+  moduleScopeAppName,
+  moduleScopeAppNameAsync,
+} from "@/module-scope-env";
 
 /**
  * Renders a module-scope read into a page that stays static. This is the
@@ -10,6 +13,7 @@ export default function ModuleScopePage() {
   return (
     <main>
       <p data-testid="module-scope-app-name">{moduleScopeAppName}</p>
+      <p data-testid="module-scope-app-name-async">{moduleScopeAppNameAsync}</p>
     </main>
   );
 }

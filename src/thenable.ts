@@ -8,8 +8,10 @@ interface RejectedThenable extends Promise<never> {
   reason: unknown;
 }
 
-export function fulfilled<TValue>(value: TValue): Promise<TValue> {
-  const promise = Promise.resolve(value) as FulfilledThenable<TValue>;
+export function fulfilled(): Promise<void>;
+export function fulfilled<TValue>(value: TValue): Promise<TValue>;
+export function fulfilled(value?: unknown): Promise<unknown> {
+  const promise = Promise.resolve(value) as FulfilledThenable<unknown>;
   promise.status = "fulfilled";
   promise.value = value;
   return promise;

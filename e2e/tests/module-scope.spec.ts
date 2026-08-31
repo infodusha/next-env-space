@@ -23,6 +23,9 @@ test.describe("a read at module scope", () => {
     await expect(page.getByTestId("module-scope-app-name")).toHaveText(
       runtimeEnv.APP_NAME,
     );
+    await expect(page.getByTestId("module-scope-app-name-async")).toHaveText(
+      runtimeEnv.APP_NAME,
+    );
   });
 
   test("is captured when rendered into a prerender — the documented trap", async ({
@@ -31,6 +34,9 @@ test.describe("a read at module scope", () => {
     await page.goto("/module-scope");
 
     await expect(page.getByTestId("module-scope-app-name")).toHaveText(
+      buildTimeEnv.APP_NAME,
+    );
+    await expect(page.getByTestId("module-scope-app-name-async")).toHaveText(
       buildTimeEnv.APP_NAME,
     );
   });

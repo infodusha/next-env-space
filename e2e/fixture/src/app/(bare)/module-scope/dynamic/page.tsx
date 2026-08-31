@@ -1,4 +1,7 @@
-import { moduleScopeAppName } from "@/module-scope-env";
+import {
+  moduleScopeAppName,
+  moduleScopeAppNameAsync,
+} from "@/module-scope-env";
 
 /**
  * The same module-scope constant on a dynamic route: the server process
@@ -10,6 +13,7 @@ export default function DynamicModuleScopePage() {
   return (
     <main>
       <p data-testid="module-scope-app-name">{moduleScopeAppName}</p>
+      <p data-testid="module-scope-app-name-async">{moduleScopeAppNameAsync}</p>
     </main>
   );
 }

@@ -9,7 +9,6 @@ and grouped into isolated **spaces**.
 
 - values are read from `process.env` **at runtime**, never inlined at build time
 - one schema per key, one type — `get("APP_NAME")` is fully typed
-- bring your own schema library: anything that implements Standard Schema plugs in
 - several spaces per app: ship one to the browser, keep another server-only
 - a guard that fails loudly when a value would be captured during a prerender
 
@@ -19,9 +18,7 @@ and grouped into isolated **spaces**.
 one environment, and a value that changes means a rebuild. Libraries that validate `env` at
 build time — [t3-env](https://env.t3.gg) among them — inherit that for the client side; the
 ones that ship values at runtime tend to hand back an untyped `string | undefined`. This
-package does both: the values are read from `process.env` when the server runs, so one build
-goes to every environment, and each one is parsed by the schema you gave it, so `get()`
-returns a `number` where you declared one.
+package does both: runtime values, each parsed by the schema you declared.
 
 ## Install
 
@@ -30,10 +27,9 @@ npm i next-env-space
 ```
 
 Needs Next.js 16.3 or later and React 19.2 or later, both peer dependencies. The package is
-ESM only.
-
-The schema library is yours to pick — every example below uses [zod](https://zod.dev), but
-any [Standard Schema](https://standardschema.dev) implementation works the same way.
+ESM only. The schema library is yours to pick — every example below uses
+[zod](https://zod.dev), but any [Standard Schema](https://standardschema.dev)
+implementation works the same way.
 
 ## Define a space
 
@@ -55,24 +51,10 @@ export const publicEnv = createEnvSpace(
 );
 ```
 
-Another library plugs in the same way — [valibot](https://valibot.dev) here — and keys from
-different libraries may share one shape:
-
-```ts
-import * as v from "valibot";
-
-export const serverEnv = createEnvSpace(
-  {
-    DATABASE_URL: v.pipe(v.string(), v.url()),
-    SESSION_SECRET: v.pipe(v.string(), v.minLength(32)),
-  },
-  { name: "server" },
-);
-```
-
-The schema is always a shape with one schema per key. A single object schema around the keys —
-`z.object({ ... })`, `v.object({ ... })` — does not type-check: Standard Schema does not expose
-the keys an object declares, and every variable is parsed on its own so a bad one can name itself.
+The schema is always a shape with one schema per key — keys from different libraries may
+even share one shape. A single object schema around the keys — `z.object({ ... })`,
+`v.object({ ... })` — does not type-check: Standard Schema does not expose the keys an
+object declares, and every variable is parsed on its own so a bad one can name itself.
 
 ### Anything that is not a string
 
@@ -100,16 +82,17 @@ async refinement throws on its first read.
 
 ## Send a space to the browser
 
-Render `ClientEnvScript` once per space, in a layout above the client components that read it.
-It serialises the raw values into a `<script>` tag, so **everything in that space becomes
-public**. Keep secrets in a separate space that is never rendered.
+Two publishers ship a space to the browser. Whichever one you render, **everything in that
+space becomes public** — keep secrets in a separate space that is never rendered.
 
-It has to sit **above** the components that read it, not merely before them: a layout that a
-client-side navigation mounts has no document left to write a script into, and the values
-reach the browser as `ClientEnvScript` itself renders there.
+### With an inline script
 
-There is a second publisher, `ClientEnvProvider`, that carries the space in React context instead
-of a script — [see below](#without-the-inline-script) for what that trades away.
+Render `ClientEnvScript` once per space, in a layout **above** the client components that
+read it — above, not merely before them: a layout that a client-side navigation mounts has
+no document left to write a script into, so there the values travel with
+`ClientEnvScript`'s own render. It serialises the raw values into a `<script>` tag that
+runs before any client module is evaluated, so it serves every read — `get()` at module
+scope included.
 
 ```tsx
 // app/layout.tsx
@@ -133,7 +116,7 @@ export default function RootLayout({
 }
 ```
 
-### Content Security Policy
+#### Content Security Policy
 
 The values are shipped in an inline `<script>`, so a policy like `script-src 'nonce-...'`
 blocks it and the space never reaches the browser. Pass the nonce to `ClientEnvScript` and it
@@ -160,49 +143,23 @@ hash-based policy or `ClientEnvProvider`.
 
 ### Without the inline script
 
-`ClientEnvProvider` publishes the same space through React context instead. Nothing is written
-into the document, so there is no nonce to pass and no `script-src` to widen — but it wraps
-the tree rather than sitting next to it:
+`ClientEnvProvider` publishes the same space through React context, wrapping the tree
+rather than sitting next to it. Nothing is written into the document, so there is no nonce
+to pass and no `script-src` to widen — but context is only readable while a component
+renders, so in the browser the only reads it serves are
+`getAsync()` / `getAllAsync()` called during a client component render
+([the table below](#where-each-read-works) has the full picture). Nothing changes on the
+server, and rendering both publishers is fine: the script answers first and the context is
+left unread.
 
 ```tsx
 // app/layout.tsx
 import { ClientEnvProvider } from "next-env-space/server";
 
-import { publicEnv } from "@/env";
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body>
-        <ClientEnvProvider space={publicEnv}>{children}</ClientEnvProvider>
-      </body>
-    </html>
-  );
-}
+<body>
+  <ClientEnvProvider space={publicEnv}>{children}</ClientEnvProvider>
+</body>;
 ```
-
-Providers nest, so a second space wraps the first:
-
-```tsx
-<ClientEnvProvider space={publicEnv}>
-  <ClientEnvProvider space={featureEnv}>{children}</ClientEnvProvider>
-</ClientEnvProvider>
-```
-
-What it costs is every read that does not happen while a component renders — context is
-only readable from a render. With `ClientEnvProvider` alone:
-
-- `get()` and `getAll()` throw in the browser; they never look at the context
-- `getAsync()` and `getAllAsync()` work inside a client component, and throw from an event
-  handler, an effect, or any other code that runs after the render
-- a read at module scope throws, for the same reason
-
-Nothing changes on the server, where the values come straight from `process.env`. Rendering
-both components is fine as well: the script answers first and the context is left unread.
 
 ## Read values
 
@@ -240,46 +197,25 @@ export function AppName() {
 }
 ```
 
-This is the only read `<ClientEnvProvider />` on its own can serve. Everything else in this
-section needs the space published with `<ClientEnvScript />`.
-
 ### Where each read works
 
 In the table, _the script_ is `<ClientEnvScript />` and _the provider_ is `<ClientEnvProvider />`.
 
-| where                                                  | `get()`                            | `getAsync()`                                                     |
-| ------------------------------------------------------ | ---------------------------------- | ---------------------------------------------------------------- |
-| Server Component render, `generateMetadata`            | ❌ throws                          | ✅ works, opts the route out of prerendering                     |
-| Client Component render                                | ⚙️ works with the script           | ⚙️ works with the provider or the script, unwrapped with `use()` |
-| Client Component, outside the render (handler, effect) | ⚙️ works with the script           | ⚙️ works with the script                                         |
-| module scope of a client module                        | ⚙️ works with the script           | ⚙️ works with the script                                         |
-| module scope of a server module                        | ✅ works                           | ✅ works                                                         |
-| Route Handler                                          | ✅ works                           | ✅ works                                                         |
-| Route Handler with `dynamic = "force-static"`          | ⚠️ **build-time value**, silently  | ⚠️ **build-time value**, silently                                |
-| Server Action                                          | ✅ works                           | ✅ works                                                         |
-| `proxy.ts` (middleware)                                | ✅ works                           | ✅ works                                                         |
-| `instrumentation.ts` — `register()`                    | ✅ works                           | ✅ works                                                         |
-| `instrumentation-client.ts`                            | ⚙️ works with the script           | ⚙️ works with the script                                         |
-| `generateStaticParams`                                 | build-time value — that is its job | ❌ throws: Next has no request to attach to                      |
-| inside a `"use cache"` function                        | ❌ throws                          | ⚠️ **build-time value**, cached                                  |
-
-`instrumentation-client.ts` runs once, as the first page loads, before any component: it
-sees a space only if that page writes the env script of `<ClientEnvScript />` — a root layout
-does — and never the context of `<ClientEnvProvider />`, which has not rendered yet.
-
-Where Next has no request to attach to, it has no prerender either — nothing the value
-could leak into — so `getAsync()` skips the opt-out and answers with exactly what `get()`
-reads in the same spot: the build machine's values in a module the build evaluates, the
-runtime ones once the server runs. That is what makes the `register()` row and an `await`
-at module scope safe — and also pointless, since `get()` is the same value without the
-promise. `generateStaticParams` is the exception Next itself refuses: it runs at build time
-by design, so a read that promises the runtime value has no honest answer there.
-
-The two bold rows are the ones no guard can catch. A `force-static` Route Handler is
-prerendered once at build, and `"use cache"` caches whatever its body returned the first
-time it ran — during `next build`. Neither read throws there, so both bake the value of
-the build machine in. Read the value outside and pass it in as an argument, or drop the
-static mode for that route.
+| where                                                  | `get()`                  | `getAsync()`                                                     |
+| ------------------------------------------------------ | ------------------------ | ---------------------------------------------------------------- |
+| Server Component render, `generateMetadata`            | ❌ throws                | ✅ works, opts the route out of prerendering                     |
+| Client Component render                                | ⚙️ works with the script | ⚙️ works with the provider or the script, unwrapped with `use()` |
+| Client Component, outside the render (handler, effect) | ⚙️ works with the script | ⚙️ works with the script                                         |
+| module scope of a client module                        | ⚙️ works with the script | ⚙️ works with the script                                         |
+| module scope of a server module                        | ✅ works                 | ✅ works                                                         |
+| Route Handler                                          | ✅ works                 | ✅ works                                                         |
+| Route Handler with `dynamic = "force-static"`          | ⚠️ **build-time value**  | ⚠️ **build-time value**                                          |
+| Server Action                                          | ✅ works                 | ✅ works                                                         |
+| `proxy.ts` (middleware)                                | ✅ works                 | ✅ works                                                         |
+| `instrumentation.ts` — `register()`                    | ✅ works                 | ✅ works                                                         |
+| `instrumentation-client.ts`                            | ⚙️ works with the script | ⚙️ works with the script                                         |
+| `generateStaticParams`                                 | ⚠️ **build-time value**  | ❌ throws                                                        |
+| inside a `"use cache"` function                        | ❌ throws                | ⚠️ **build-time value**                                          |
 
 ## Cache Components
 
@@ -319,7 +255,13 @@ client. Spaces are independent: each has its own schema, its own cache and its o
 <ClientEnvScript space={featureEnv} />
 ```
 
-`<ClientEnvProvider />` nests instead of repeating, and merges with the provider above it.
+`<ClientEnvProvider />` nests instead of repeating, and merges with the provider above it:
+
+```tsx
+<ClientEnvProvider space={publicEnv}>
+  <ClientEnvProvider space={featureEnv}>{children}</ClientEnvProvider>
+</ClientEnvProvider>
+```
 
 ## Recipes
 
@@ -348,28 +290,27 @@ values — there is just nothing to `await`, so the synchronous read says it str
 Nothing in the package needs the real values at `next build`: the publishers and `getAsync`
 opt out of prerendering, so a `Dockerfile` can build the app without a single variable set
 and let `docker run -e` or the orchestrator supply them to `next start`. The exceptions are
-the reads that run at build time by nature — module scope of a module the build evaluates,
-`generateStaticParams`, the bold rows of the table above. Those see whatever the build
-machine has, and a required key that is missing there fails the build, which is the right
-call: the value would have been baked in otherwise. `output: "standalone"` changes nothing,
-`node server.js` reads the same `process.env`.
+the reads that run at build time by nature — the ⚠️ rows of
+[the table](#where-each-read-works), plus module scope of a module the build evaluates.
+Those see whatever the build machine has, and a required key that is missing there fails
+the build, which is the right call: the value would have been baked in otherwise.
+`output: "standalone"` changes nothing, `node server.js` reads the same `process.env`.
 
 ### Testing
 
-The space caches its parsed values for the lifetime of the process and reads `process.env`
-when a module first touches it. In a unit test, set the variables first and import the module
-under test afterwards — `vi.resetModules()` between cases gives every set of values a fresh
-space. Under a browser-like environment (`jsdom`, `happy-dom`) `window` exists, so the space
-looks for the values `<ClientEnvScript />` publishes and finds none: run the tests of
-server-side code in the `node` environment.
+A space reads `process.env` when a module first touches it and caches the result. In a unit
+test, set the variables first and import the module under test afterwards —
+`vi.resetModules()` between cases gives every set of values a fresh space. Under a
+browser-like environment (`jsdom`, `happy-dom`) `window` exists, so the space looks for the
+values `<ClientEnvScript />` publishes and finds none: run the tests of server-side code in
+the `node` environment.
 
 ## API
 
 ### `createEnvSpace(schema, options?): EnvSpace`
 
 `schema` is a shape with one [Standard Schema](https://standardschema.dev) per key
-(`{ FOO: z.string() }`), from any library that implements the spec. Every key is parsed with
-its own schema, so a missing or malformed variable names itself in the error.
+(`{ FOO: z.string() }`), from any library that implements the spec.
 
 | option | default     | meaning                               |
 | ------ | ----------- | ------------------------------------- |
@@ -377,10 +318,12 @@ its own schema, so a missing or malformed variable names itself in the error.
 
 The returned space exposes:
 
-- `get(key)` / `getAll()` — synchronous, outside a Server Component render
-- `getAsync(key)` / `getAllAsync()` — inside a Server Component, opts the render out
-  of prerendering first; in a client component, safe to unwrap with `use()`
+- `get(key)` / `getAll()` — synchronous reads
+- `getAsync(key)` / `getAllAsync()` — asynchronous reads, the only ones that work inside a
+  Server Component render; in a client component, safe to unwrap with `use()`
 - `name`, `keys`, `schema`
+
+[Where each read works](#where-each-read-works) maps both onto every calling context.
 
 ### `InferEnv<typeof space>`
 
@@ -398,13 +341,10 @@ The shape itself works as well — `InferEnv<typeof publicEnv.schema>` names the
 
 ### `next-env-space/server`
 
-- `<ClientEnvScript space={space} />` — ships one space to the browser in an inline
-  `<script>`, before any client module is evaluated, or from the browser itself when a
-  client-side navigation is what mounts it. Takes an optional `nonce` for CSP. Serves every
-  read, `get()` included
-- `<ClientEnvProvider space={space}>{children}</ClientEnvProvider>` — ships the same space through
-  React context. No inline script and no nonce, but only `getAsync()` / `getAllAsync()`
-  can read it, and only from a component below it
+- `<ClientEnvScript space={space} />` — publishes one space in an inline `<script>`; takes
+  an optional `nonce` for CSP
+- `<ClientEnvProvider space={space}>{children}</ClientEnvProvider>` — publishes it through
+  React context instead
 
 This entry point is marked `server-only`; importing it from a client component fails the
 build.

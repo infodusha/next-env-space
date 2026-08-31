@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/infodusha/next-env-space/compare/v3.0.0...v3.1.0) (2026-08-31)
+
+
+### Features
+
+* allow getAsync() outside of request scope ([85c1eb8](https://github.com/infodusha/next-env-space/commit/85c1eb8583274c0481897a7e318c8605f7ce8a1a))
+
 ## [3.0.0](https://github.com/infodusha/next-env-space/compare/v2.0.0...v3.0.0) (2026-08-30)
 
 

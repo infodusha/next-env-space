@@ -78,7 +78,7 @@ publicEnv.get("SERVICE_URLS"); // Record<string, string>
 ```
 
 Schemas have to validate synchronously: the values are parsed on the spot, so a key with an
-async refinement throws on its first read.
+async refinement fails on its first read.
 
 ## Send a space to the browser
 
@@ -386,8 +386,8 @@ build.
 - The whole space is parsed on first read and cached for the lifetime of the process, so a
   bad value fails fast rather than at the call site that happens to need it — and the error
   names every bad value at once, not one per restart.
-- A key the space does not declare throws in `get()` and `getAsync()` rather than reading as
-  `undefined`.
+- A key the space does not declare throws in `get()` and rejects in `getAsync()` rather than
+  reading as `undefined`.
 - Two spaces under one `name` overwrite each other on the client. That is harmless while
   they declare the same keys — a hot reload re-creates a space this way — and an error as
   soon as they do not: a warning in development, a thrown error in production.

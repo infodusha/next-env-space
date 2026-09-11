@@ -31,7 +31,6 @@ export function EnvScript({ name, rawEnv, nonce, failure }: EnvScriptProps) {
       <script
         nonce={nonce}
         dangerouslySetInnerHTML={{ __html: createEnvScript(name, rawEnv) }}
-        type="text/javascript"
       />
     );
   });

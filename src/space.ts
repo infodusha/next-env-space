@@ -1,16 +1,16 @@
 import { isErrorDocumentReadError, reportAfterBoot } from "./error-document.js";
+import type { RawEnv } from "./global.js";
 import {
   assertKnownKey,
-  assertNotInRender,
   assertOptedOut,
+  assertReadAllowed,
   claimName,
 } from "./guards.js";
-import { assertNotMisused } from "./misuse.js";
 import { parseEnv } from "./parse.js";
-import { readRawEnv, type EnvRuntime } from "./raw-env.js";
+import { readRawEnv, type EnvRuntime, type ReadContext } from "./raw-env.js";
 import { isMissingRequestScope } from "./request-scope.js";
 import type { EnvSchema, ParsedEnv } from "./schema.js";
-import { fulfilled, isFulfilled, rejected } from "./thenable.js";
+import { fulfilled, isFulfilled, rejectOnThrow } from "./thenable.js";
 
 const defaultSpaceName = "default";
 
@@ -51,9 +51,11 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * Where Next has no request to attach to — module scope of a server module,
    * `register()` in instrumentation.ts, a cached function the running server
    * fills — there is no prerender either, so it resolves with what the
-   * synchronous `get` reads there. Throws where there is nothing to opt out
-   * of and `next build` would capture the value all the same:
-   * `generateStaticParams`, a cached function, a Route Handler it prerenders.
+   * synchronous `get` reads there. Rejects where there is nothing to opt out
+   * of and `next build` would capture the value all the same —
+   * `generateStaticParams`, a cached function, a Route Handler it prerenders —
+   * and on a key the schema has not declared. Every failure is a rejection,
+   * never a synchronous throw.
    */
   getAsync<TKey extends keyof TSchema>(
     key: TKey,
@@ -110,7 +112,12 @@ export interface CreateEnvSpace {
   ): EnvSpace<TSchema>;
 }
 
-const readers = new WeakMap<object, () => unknown>();
+export interface ShippedEnv {
+  readonly rawEnv: RawEnv;
+  readonly failure: Error | undefined;
+}
+
+const shippers = new WeakMap<object, () => ShippedEnv>();
 
 export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
   return function createEnvSpace<TSchema extends EnvSchema>(
@@ -126,18 +133,18 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
     let cachedEnv: ParsedEnv<TSchema> | null = null;
 
-    function readAllEnv(fromContext: boolean): ParsedEnv<TSchema> {
-      cachedEnv ??= parseEnv(
-        schema,
-        readRawEnv(runtime, name, fromContext),
-        name,
-      );
+    function parseOnce(rawEnv: RawEnv): ParsedEnv<TSchema> {
+      cachedEnv ??= parseEnv(schema, rawEnv, name);
       return cachedEnv;
+    }
+
+    function readAllEnv(readContext: ReadContext | null): ParsedEnv<TSchema> {
+      return cachedEnv ?? parseOnce(readRawEnv(name, readContext));
     }
 
     function readSyncEnv(): ParsedEnv<TSchema> | undefined {
       try {
-        return readAllEnv(false);
+        return readAllEnv(null);
       } catch (error) {
         if (!isErrorDocumentReadError(error)) {
           throw error;
@@ -154,8 +161,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     }
 
     function getAll(): ParsedEnv<TSchema> {
-      assertNotMisused(name, "getAll()");
-      assertNotInRender(name, "getAll()");
+      assertReadAllowed(name, "getAll()", true);
       return readSyncEnv() ?? noValues();
     }
 
@@ -163,62 +169,64 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       key: TKey,
     ): ParsedEnv<TSchema>[TKey] {
       assertKnownKey(schema, name, key);
-      const call = `get('${String(key)}')`;
-      assertNotMisused(name, call);
-      assertNotInRender(name, call);
+      assertReadAllowed(name, `get('${String(key)}')`, true);
       return readSyncEnv()?.[key] as ParsedEnv<TSchema>[TKey];
     }
 
-    const settledReads = new Map<keyof TSchema | null, Promise<unknown>>();
-
-    function readAsync<TValue>(
-      call: string,
-      key: keyof TSchema | null,
-      pick: (env: ParsedEnv<TSchema>) => TValue,
-    ): Promise<TValue> {
-      assertNotMisused(name, call);
-
-      let optedOut: Promise<void>;
+    function optOutOfPrerender(): Promise<void> {
       try {
-        optedOut = runtime.optOutOfPrerender();
+        return runtime.optOutOfPrerender();
       } catch (error) {
         if (!isMissingRequestScope(error)) {
           throw error;
         }
-        optedOut = fulfilled();
-      }
-
-      if (!isFulfilled(optedOut)) {
-        return optedOut.then(() => {
-          assertOptedOut(runtime, name);
-          return pick(readAllEnv(true));
-        });
-      }
-
-      const remembered = settledReads.get(key);
-      if (remembered !== undefined) {
-        return remembered as Promise<TValue>;
-      }
-
-      try {
-        assertOptedOut(runtime, name);
-        const promise = fulfilled(pick(readAllEnv(true)));
-        settledReads.set(key, promise);
-        return promise;
-      } catch (error) {
-        return rejected(error);
+        return fulfilled();
       }
     }
 
+    function readAsync<TValue>(
+      call: string,
+      pick: (env: ParsedEnv<TSchema>) => TValue,
+    ): Promise<TValue> {
+      assertReadAllowed(name, call, false);
+
+      const optedOut = optOutOfPrerender();
+      if (isFulfilled(optedOut)) {
+        assertOptedOut(runtime, name);
+        return fulfilled(pick(readAllEnv(runtime.readContextRawEnv)));
+      }
+
+      return optedOut.then(() => {
+        assertOptedOut(runtime, name);
+        return pick(readAllEnv(runtime.readContextRawEnv));
+      });
+    }
+
     function getAllAsync(): Promise<ParsedEnv<TSchema>> {
-      return readAsync("getAllAsync()", null, (env) => env);
+      return rejectOnThrow(() => readAsync("getAllAsync()", (env) => env));
     }
 
     function getAsync<TKey extends keyof TSchema>(
       key: TKey,
     ): Promise<ParsedEnv<TSchema>[TKey]> {
-      assertKnownKey(schema, name, key);
-      return readAsync(`getAsync('${String(key)}')`, key, (env) => env[key]);
+      return rejectOnThrow(() => {
+        assertKnownKey(schema, name, key);
+        return readAsync(`getAsync('${String(key)}')`, (env) => env[key]);
+      });
+    }
+
+    function ship(): ShippedEnv {
+      const source = readRawEnv(name, null);
+      const rawEnv = Object.fromEntries(keys.map((key) => [key, source[key]]));
+      try {
+        parseOnce(source);
+        return { rawEnv, failure: undefined };
+      } catch (error) {
+        return {
+          rawEnv,
+          failure: error instanceof Error ? error : new Error(String(error)),
+        };
+      }
     }
 
     const space = {
@@ -231,20 +239,20 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       getAllAsync,
     } as EnvSpace<TSchema>;
 
-    readers.set(space, () => readAllEnv(false));
+    shippers.set(space, ship);
 
     return space;
   };
 }
 
-export function readEnvSpace<TSchema extends EnvSchema>(
+export function readShippedEnv<TSchema extends EnvSchema>(
   space: EnvSpace<TSchema>,
-): ParsedEnv<TSchema> {
-  const read = readers.get(space);
-  if (read === undefined) {
+): ShippedEnv {
+  const ship = shippers.get(space);
+  if (ship === undefined) {
     throw new Error(
       `Env space "${space.name}" was not created by createEnvSpace() of this package instance.`,
     );
   }
-  return read() as ParsedEnv<TSchema>;
+  return ship();
 }

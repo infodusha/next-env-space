@@ -1,16 +1,17 @@
 import { errorDocumentReadError, isErrorDocument } from "./error-document.js";
 import { envSpacesKey, type RawEnv } from "./global.js";
 
+export type ReadContext = (name: string) => RawEnv | undefined;
+
 export interface EnvRuntime {
   readonly optOutOfPrerender: () => Promise<void>;
   readonly optsOutInReactServer: boolean;
-  readonly readContextRawEnv: ((name: string) => RawEnv | undefined) | null;
+  readonly readContextRawEnv: ReadContext | null;
 }
 
 export function readRawEnv(
-  runtime: EnvRuntime,
   name: string,
-  fromContext: boolean,
+  readContext: ReadContext | null,
 ): RawEnv {
   if (typeof window === "undefined") {
     return process.env;
@@ -21,7 +22,8 @@ export function readRawEnv(
     return published;
   }
 
-  const provided = fromContext ? readProvidedEnv(runtime, name) : undefined;
+  const provided =
+    readContext === null ? undefined : readProvidedEnv(readContext, name);
   if (provided !== undefined) {
     return provided;
   }
@@ -38,16 +40,11 @@ export function readRawEnv(
 }
 
 function readProvidedEnv(
-  runtime: EnvRuntime,
+  readContext: ReadContext,
   name: string,
 ): RawEnv | undefined {
-  const read = runtime.readContextRawEnv;
-  if (read === null) {
-    return undefined;
-  }
-
   try {
-    return read(name);
+    return readContext(name);
   } catch {
     if (isErrorDocument()) {
       throw errorDocumentReadError(name);

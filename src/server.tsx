@@ -3,9 +3,8 @@ import type { ReactNode } from "react";
 
 import { EnvScript, EnvProvider } from "./client.js";
 import { optOutOfPrerender } from "./dynamic.js";
-import type { RawEnv } from "./global.js";
 import type { EnvSchema } from "./schema.js";
-import { readEnvSpace, type EnvSpace } from "./space.js";
+import { readShippedEnv, type EnvSpace, type ShippedEnv } from "./space.js";
 
 export interface ClientEnvScriptProps<TSchema extends EnvSchema> {
   /** The env space to ship, created by `createEnvSpace()`. */
@@ -27,13 +26,13 @@ export async function ClientEnvScript<TSchema extends EnvSchema>({
   space,
   nonce,
 }: ClientEnvScriptProps<TSchema>) {
-  const rawEnv = await readRawValues(space);
+  const { rawEnv, failure } = await ship(space);
   return (
     <EnvScript
       name={space.name}
       rawEnv={rawEnv}
       nonce={nonce}
-      failure={describeFailure(space)}
+      failure={failure?.message}
     />
   );
 }
@@ -57,8 +56,10 @@ export async function ClientEnvProvider<TSchema extends EnvSchema>({
   space,
   children,
 }: ClientEnvProviderProps<TSchema>) {
-  const rawEnv = await readRawValues(space);
-  readEnvSpace(space);
+  const { rawEnv, failure } = await ship(space);
+  if (failure !== undefined) {
+    throw failure;
+  }
   return (
     <EnvProvider name={space.name} rawEnv={rawEnv}>
       {children}
@@ -66,20 +67,9 @@ export async function ClientEnvProvider<TSchema extends EnvSchema>({
   );
 }
 
-async function readRawValues<TSchema extends EnvSchema>(
+async function ship<TSchema extends EnvSchema>(
   space: EnvSpace<TSchema>,
-): Promise<RawEnv> {
+): Promise<ShippedEnv> {
   await optOutOfPrerender();
-  return Object.fromEntries(space.keys.map((key) => [key, process.env[key]]));
-}
-
-function describeFailure<TSchema extends EnvSchema>(
-  space: EnvSpace<TSchema>,
-): string | undefined {
-  try {
-    readEnvSpace(space);
-    return undefined;
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
+  return readShippedEnv(space);
 }

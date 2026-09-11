@@ -3,7 +3,7 @@ import * as react from "react";
 import { isProduction } from "./process-env.js";
 import type { EnvRuntime } from "./raw-env.js";
 import type { EnvSchema } from "./schema.js";
-import { isBuildTime } from "./work-unit.js";
+import { currentWorkUnit, isBuildTime, isCacheScope } from "./work-unit.js";
 
 const takenSpaces = new Map<string, readonly string[]>();
 
@@ -63,16 +63,54 @@ function isServerRender(): boolean {
   );
 }
 
-export function assertNotInRender(name: string, call: string): void {
-  if (typeof window !== "undefined" || !isServerRender() || !isBuildTime()) {
+export function assertReadAllowed(
+  name: string,
+  call: string,
+  sync: boolean,
+): void {
+  if (typeof window !== "undefined") {
     return;
   }
 
-  throw new Error(
-    `${call} of the "${name}" env space is called while prerendering, so its value would be baked into the build output. ` +
-      `Use getAsync() instead, or move the read out of the render — a Route Handler, a Server Action, instrumentation.ts. ` +
-      `Inside a "use cache" function neither works: pass the value in as an argument.`,
-  );
+  const read = `${call} of the "${name}" env space`;
+  const unit = currentWorkUnit();
+
+  if (unit?.type === "generate-static-params") {
+    throw new Error(
+      `${read} is called inside generateStaticParams, which only runs at build time, so the value could only be the build machine's. ` +
+        `Compute the params without it, and read the value where they are used — getAsync() in the page, get() in a Route Handler.`,
+    );
+  }
+
+  if (!isBuildTime(unit)) {
+    return;
+  }
+
+  if (isCacheScope(unit)) {
+    throw new Error(
+      `${read} is called inside a cached function — "use cache" or unstable_cache() — while the build fills the cache, so every request would be served the build machine's value. ` +
+        `Read the value outside and pass it in as an argument.`,
+    );
+  }
+
+  if (
+    unit !== undefined &&
+    unit.phase === "action" &&
+    unit.type !== "request"
+  ) {
+    throw new Error(
+      `${read} is called in a Route Handler while Next prerenders it at build time, so the value would be captured into the static response. ` +
+        `Make the handler dynamic — await connection() before the read, or drop dynamic = "force-static".`,
+    );
+  }
+
+  if (sync && isServerRender()) {
+    throw new Error(
+      `${read} is called while prerendering, so its value would be baked into the build output. ` +
+        `Use getAsync() instead, or move the read out of the render — a Route Handler, a Server Action, instrumentation.ts. ` +
+        `Inside a "use cache" function neither works: pass the value in as an argument.`,
+    );
+  }
 }
 
 export function assertOptedOut(runtime: EnvRuntime, name: string): void {

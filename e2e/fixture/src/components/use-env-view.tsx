@@ -6,8 +6,8 @@ import { featureEnv, publicEnv } from "@/env";
 
 /**
  * Reads the spaces through `use()`, which needs a promise that is already
- * settled and the same on every render — otherwise React suspends on it, and
- * says so on the console in development.
+ * settled — otherwise React suspends on it, and says so on the console in
+ * development.
  */
 export function UseEnvView() {
   countRender();

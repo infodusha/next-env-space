@@ -28,3 +28,13 @@ export function rejected(reason: unknown): Promise<never> {
 export function isFulfilled(promise: Promise<unknown>): boolean {
   return (promise as { status?: unknown }).status === "fulfilled";
 }
+
+export function rejectOnThrow<TValue>(
+  read: () => Promise<TValue>,
+): Promise<TValue> {
+  try {
+    return read();
+  } catch (error) {
+    return rejected(error);
+  }
+}

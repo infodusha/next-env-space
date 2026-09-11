@@ -14,5 +14,15 @@ export function envContext(): react.Context<EnvSpaces> {
 }
 
 export function readContextRawEnv(name: string): RawEnv | undefined {
+  if (!isReactRunning()) {
+    throw new Error("React is not rendering, so there is no context to read.");
+  }
   return react.use(envContext())[name];
+}
+
+function isReactRunning(): boolean {
+  return (
+    typeof react.captureOwnerStack !== "function" ||
+    react.captureOwnerStack() !== null
+  );
 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.2.0](https://github.com/infodusha/next-env-space/compare/v3.1.0...v3.2.0) (2026-09-11)
+
+
+### Features
+
+* preserve error overlay ([dfa2694](https://github.com/infodusha/next-env-space/commit/dfa2694ff48920c35f009445b6e7c348a7739f16))
+
+
+### Bug Fixes
+
+* hide "Invalid hook cal" for `getAsync` ([86b883f](https://github.com/infodusha/next-env-space/commit/86b883f6792e39f7583fe99c607226e0a52acfdb))
+
 ## [3.1.0](https://github.com/infodusha/next-env-space/compare/v3.0.0...v3.1.0) (2026-08-31)
 
 

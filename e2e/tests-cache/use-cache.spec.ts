@@ -12,7 +12,7 @@ test.describe('a read inside a "use cache" function', () => {
     await page.goto("/contexts/use-cache");
 
     await expect(page.getByTestId("use-cache-sync")).toContainText(
-      "is called while rendering, so its value can be captured at build time",
+      "is called while prerendering, so its value would be baked into the build output",
     );
   });
 

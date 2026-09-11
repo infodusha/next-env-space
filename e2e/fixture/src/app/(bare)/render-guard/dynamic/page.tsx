@@ -1,15 +1,18 @@
 import { publicEnv } from "@/env";
 
-/** The same guard, but in a render that is dynamic from the start. */
+/**
+ * The same read in a render that is dynamic from the start: nothing captures
+ * the value there, so the guard lets it through with the runtime value.
+ */
 export const dynamic = "force-dynamic";
 
 export default function DynamicRenderGuardPage() {
-  let message = "no error";
+  let message: string;
 
   try {
-    publicEnv.get("APP_NAME");
+    message = `ok:${publicEnv.get("APP_NAME")}`;
   } catch (error) {
-    message = error instanceof Error ? error.message : String(error);
+    message = `err:${error instanceof Error ? error.message : String(error)}`;
   }
 
   return (

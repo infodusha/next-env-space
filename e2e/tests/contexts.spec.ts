@@ -13,7 +13,7 @@ import { fixtureDir } from "../paths.js";
  * rather than crashed into.
  */
 const guardMessage =
-  "is called while rendering, so its value can be captured at build time";
+  "is called while prerendering, so its value would be baked into the build output";
 
 const appDir = path.join(fixtureDir, ".next", "server", "app");
 

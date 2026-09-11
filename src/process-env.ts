@@ -14,6 +14,5 @@ const cacheComponents = hasProcess
 export const cacheComponentsEnabled: boolean =
   cacheComponents === true || cacheComponents === "true";
 
-export function isProduction(): boolean {
-  return hasProcess && process.env.NODE_ENV === "production";
-}
+export const isProduction: boolean =
+  hasProcess && process.env.NODE_ENV === "production";

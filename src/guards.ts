@@ -1,5 +1,6 @@
 import * as react from "react";
 
+import { isBuildTimeRender } from "./build-time.js";
 import { isProduction } from "./process-env.js";
 import type { EnvRuntime } from "./raw-env.js";
 import type { EnvSchema } from "./schema.js";
@@ -21,7 +22,7 @@ export function claimName(name: string, keys: readonly string[]): void {
     `The one that reaches the browser last replaces the other, so every read of that other one fails. ` +
     `Pass a unique "name" option to createEnvSpace().`;
 
-  if (isProduction()) {
+  if (isProduction) {
     throw new Error(message);
   }
 
@@ -63,12 +64,16 @@ function isServerRender(): boolean {
 }
 
 export function assertNotInRender(name: string, call: string): void {
-  if (typeof window !== "undefined" || !isServerRender()) {
+  if (
+    typeof window !== "undefined" ||
+    !isServerRender() ||
+    !isBuildTimeRender()
+  ) {
     return;
   }
 
   throw new Error(
-    `${call} of the "${name}" env space is called while rendering, so its value can be captured at build time. ` +
+    `${call} of the "${name}" env space is called while prerendering, so its value would be baked into the build output. ` +
       `Use getAsync() instead, or move the read out of the render — a Route Handler, a Server Action, instrumentation.ts. ` +
       `Inside a "use cache" function neither works: pass the value in as an argument.`,
   );

@@ -3,19 +3,20 @@ import { connection } from "next/server";
 import { publicEnv } from "@/env";
 
 /**
- * The same guard, but in a render that is dynamic from the start —
- * `connection()`, since a route segment config would not survive Cache
- * Components.
+ * The same read in a render that is dynamic from the start — `connection()`,
+ * since a route segment config would not survive Cache Components. Nothing
+ * captures the value there, so the guard lets it through with the runtime
+ * value.
  */
 export default async function DynamicRenderGuardPage() {
   await connection();
 
-  let message = "no error";
+  let message: string;
 
   try {
-    publicEnv.get("APP_NAME");
+    message = `ok:${publicEnv.get("APP_NAME")}`;
   } catch (error) {
-    message = error instanceof Error ? error.message : String(error);
+    message = `err:${error instanceof Error ? error.message : String(error)}`;
   }
 
   return (

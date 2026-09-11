@@ -29,7 +29,7 @@ test.describe("the static shell", () => {
     const shell = readFileSync(path.join(appDir, "render-guard.html"), "utf8");
 
     expect(shell).toContain(
-      "is called while rendering, so its value can be captured at build time",
+      "is called while prerendering, so its value would be baked into the build output",
     );
   });
 

@@ -44,29 +44,33 @@ would silently test the build before it.
 
 ## Routes of the plain fixture
 
-| route                   | what it covers                                            |
-| ----------------------- | --------------------------------------------------------- |
-| `/`                     | `getAsync()` in a Server Component, plus a client read    |
-| `/client`               | the same client read after a client-side navigation       |
-| `/use-env`              | `getAsync()` unwrapped with `use()` in a client component |
-| `/csp`                  | the inline script under the strict CSP of `src/proxy.ts`  |
-| `/unpublished`          | a space that was never sent to the browser                |
-| `/unpublished/use`      | the same space read with `use()`, caught by a boundary    |
-| `/render-guard`         | `get()` during a build-time prerender                     |
-| `/render-guard/dynamic` | `get()` during a dynamic render                           |
-| `/async-env`            | `space.getAsync()` on an otherwise static route           |
-| `/module-scope`         | a module-scope read rendered into a prerender             |
-| `/module-scope/dynamic` | the same module-scope value on a dynamic route            |
-| `/action`               | `get()` and `getAsync()` inside a Server Action           |
-| `/api/env`              | `get()` and `getAsync()` in a Route Handler               |
-| `/api/broken`           | a value the schema rejects                                |
-| `/api/broken-pair`      | two bad values, reported in one error                     |
-| `/broken`               | a published space whose value the schema rejects          |
-| `/provided`             | a space carried by `<ClientEnvProvider />` context alone  |
-| `/provided-late`        | the same space read after the render, which has to fail   |
-| `/soft-nav`             | a client-side navigation into the layouts that publish    |
-| `/guards`               | every misuse the API rejects, and how it words it         |
-| `/contexts/*`           | the rows of the README table "Where each read works"      |
+| route                   | what it covers                                             |
+| ----------------------- | ---------------------------------------------------------- |
+| `/`                     | `getAsync()` in a Server Component, plus a client read     |
+| `/client`               | the same client read after a client-side navigation        |
+| `/use-env`              | `getAsync()` unwrapped with `use()` in a client component  |
+| `/csp`                  | the inline script under the strict CSP of `src/proxy.ts`   |
+| `/unpublished`          | a space that was never sent to the browser                 |
+| `/unpublished/use`      | the same space read with `use()`, caught by a boundary     |
+| `/render-guard`         | `get()` during a build-time prerender                      |
+| `/render-guard/dynamic` | `get()` during a dynamic render, which captures nothing    |
+| `/isr/[slug]`           | `get()` during an ISR prerender on the running server      |
+| `/lazy-import`          | a module-scope read in a module a component imports lazily |
+| `/prefetch`             | a link whose prefetch reaches `/prefetch/target` first     |
+| `/prefetch/target`      | module-scope reads in a page below a loading boundary      |
+| `/async-env`            | `space.getAsync()` on an otherwise static route            |
+| `/module-scope`         | a module-scope read rendered into a prerender              |
+| `/module-scope/dynamic` | the same module-scope value on a dynamic route             |
+| `/action`               | `get()` and `getAsync()` inside a Server Action            |
+| `/api/env`              | `get()` and `getAsync()` in a Route Handler                |
+| `/api/broken`           | a value the schema rejects                                 |
+| `/api/broken-pair`      | two bad values, reported in one error                      |
+| `/broken`               | a published space whose value the schema rejects           |
+| `/provided`             | a space carried by `<ClientEnvProvider />` context alone   |
+| `/provided-late`        | the same space read after the render, which has to fail    |
+| `/soft-nav`             | a client-side navigation into the layouts that publish     |
+| `/guards`               | every misuse the API rejects, and how it words it          |
+| `/contexts/*`           | the rows of the README table "Where each read works"       |
 
 The routes under `(published)` sit below a layout that renders `<ClientEnvScript />`;
 the ones under `(bare)` do not, which is what lets `/render-guard` be prerendered

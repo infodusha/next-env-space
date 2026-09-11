@@ -10,7 +10,7 @@ and grouped into isolated **spaces**.
 - values are read from `process.env` **at runtime**, never inlined at build time
 - one schema per key, one type — `get("APP_NAME")` is fully typed
 - several spaces per app: ship one to the browser, keep another server-only
-- a guard that fails loudly when a value would be captured during a prerender
+- a guard that fails loudly when a value would be baked in at build time
 
 ## Why
 
@@ -171,8 +171,13 @@ const appName = publicEnv.get("APP_NAME"); // string
 const timeout = publicEnv.get("REQUEST_TIMEOUT_SECONDS"); // number
 ```
 
-Inside a Server Component the value would be baked into the prerender, so `get` throws
-there. Use `getAsync` — it opts the render out of prerendering first:
+Inside a Server Component the value would be baked into the build output, so `get` throws
+while `next build` prerenders the route — and, in development, while Cache Components runs
+the prerender that stands in for the build. Every render the running server does — a
+dynamic request, an ISR revalidation, a runtime prefetch, a static shell it regenerates —
+reads that server's environment, and there `get` answers the runtime value. Use `getAsync`
+all the same — it opts the render out of prerendering first, so the same code survives the
+route turning static:
 
 ```tsx
 import { publicEnv } from "@/env";
@@ -201,21 +206,29 @@ export function AppName() {
 
 In the table, _the script_ is `<ClientEnvScript />` and _the provider_ is `<ClientEnvProvider />`.
 
-| where                                                  | `get()`                  | `getAsync()`                                                     |
-| ------------------------------------------------------ | ------------------------ | ---------------------------------------------------------------- |
-| Server Component render, `generateMetadata`            | ❌ throws                | ✅ works, opts the route out of prerendering                     |
-| Client Component render                                | ⚙️ works with the script | ⚙️ works with the provider or the script, unwrapped with `use()` |
-| Client Component, outside the render (handler, effect) | ⚙️ works with the script | ⚙️ works with the script                                         |
-| module scope of a client module                        | ⚙️ works with the script | ⚙️ works with the script                                         |
-| module scope of a server module                        | ✅ works                 | ✅ works                                                         |
-| Route Handler                                          | ✅ works                 | ✅ works                                                         |
-| Route Handler with `dynamic = "force-static"`          | ⚠️ **build-time value**  | ⚠️ **build-time value**                                          |
-| Server Action                                          | ✅ works                 | ✅ works                                                         |
-| `proxy.ts` (middleware)                                | ✅ works                 | ✅ works                                                         |
-| `instrumentation.ts` — `register()`                    | ✅ works                 | ✅ works                                                         |
-| `instrumentation-client.ts`                            | ⚙️ works with the script | ⚙️ works with the script                                         |
-| `generateStaticParams`                                 | ⚠️ **build-time value**  | ❌ throws                                                        |
-| inside a `"use cache"` function                        | ❌ throws                | ⚠️ **build-time value**                                          |
+| where                                                  | `get()`                                           | `getAsync()`                                                     |
+| ------------------------------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------- |
+| Server Component render, `generateMetadata`            | ❌ throws at build time                           | ✅ works, opts the route out of prerendering                     |
+| Client Component render                                | ⚙️ works with the script                          | ⚙️ works with the provider or the script, unwrapped with `use()` |
+| Client Component, outside the render (handler, effect) | ⚙️ works with the script                          | ⚙️ works with the script                                         |
+| module scope of a client module                        | ⚙️ works with the script                          | ⚙️ works with the script                                         |
+| module scope of a server module                        | ✅ works                                          | ✅ works                                                         |
+| Route Handler                                          | ✅ works                                          | ✅ works                                                         |
+| Route Handler with `dynamic = "force-static"`          | ⚠️ **build-time value**                           | ⚠️ **build-time value**                                          |
+| Server Action                                          | ✅ works                                          | ✅ works                                                         |
+| `proxy.ts` (middleware)                                | ✅ works                                          | ✅ works                                                         |
+| `instrumentation.ts` — `register()`                    | ✅ works                                          | ✅ works                                                         |
+| `instrumentation-client.ts`                            | ⚙️ works with the script                          | ⚙️ works with the script                                         |
+| `generateStaticParams`                                 | ⚠️ **build-time value**                           | ❌ throws                                                        |
+| inside a `"use cache"` function                        | ❌ throws at build time, ⚠️ runtime value, cached | ⚠️ **build-time value**                                          |
+
+A module that Next imports lazily inside a render — a dynamic `import()` in a Server
+Component, or a page module that an older Next only reached while resolving metadata for a
+prefetch — runs its module scope inside that render, where React cannot tell a module-scope
+read from one in a component body. That is why the guard rejects a read only where the
+build output is being written: on the running server the module-scope read goes through
+with the runtime value, during `next build` it still throws. A module the build has to
+evaluate is better imported statically.
 
 A read at module scope of `instrumentation-client.ts` runs before Next boots the page, so a
 throw there stops the boot and hides every error Next would otherwise show, this one included:

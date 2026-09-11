@@ -132,11 +132,23 @@ test.describe("reads outside a render", () => {
 });
 
 test.describe("guards and module scope", () => {
-  test("get() throws in a dynamic render too", async ({ page }) => {
+  test("get() answers the runtime value in a dynamic render, which captures nothing", async ({
+    page,
+  }) => {
     await page.goto("/render-guard/dynamic");
 
-    await expect(page.getByTestId("message")).toContainText(
-      "is called while rendering, so its value can be captured at build time",
+    await expect(page.getByTestId("message")).toHaveText(
+      `ok:${runtimeEnv.APP_NAME}`,
+    );
+  });
+
+  test("a module-scope read in a module a dynamic import() loads goes through", async ({
+    page,
+  }) => {
+    await page.goto("/lazy-import");
+
+    await expect(page.getByTestId("lazy-app-name")).toHaveText(
+      `ok:${runtimeEnv.APP_NAME}`,
     );
   });
 

@@ -3,10 +3,11 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import { runtimeEnv } from "../env.js";
 import { fixtureDir } from "../paths.js";
 
 const guardMessage =
-  "is called while rendering, so its value can be captured at build time";
+  "is called while prerendering, so its value would be baked into the build output";
 
 test.describe("get() inside a Server Component render", () => {
   test("throws while the route is prerendered at build time", async ({
@@ -20,10 +21,30 @@ test.describe("get() inside a Server Component render", () => {
     await expect(page.getByTestId("message")).toContainText(guardMessage);
   });
 
-  test("throws in a dynamic render too", async ({ page }) => {
+  test("answers the runtime value in a dynamic render, which captures nothing", async ({
+    page,
+  }) => {
     await page.goto("/render-guard/dynamic");
 
-    await expect(page.getByTestId("message")).toContainText(guardMessage);
+    await expect(page.getByTestId("message")).toHaveText(
+      `ok:${runtimeEnv.APP_NAME}`,
+    );
+  });
+});
+
+test.describe("get() inside a prerender on the running server", () => {
+  test("ISR on demand: answers the runtime value, and the page is cached", async ({
+    request,
+  }) => {
+    // No params at build time, so this is the first render of the route — a
+    // prerender, but one the running server does with its own environment.
+    const first = await request.get("/isr/on-demand");
+    expect(first.status()).toBe(200);
+    expect(await first.text()).toContain(`ok:${runtimeEnv.APP_NAME}`);
+
+    const second = await request.get("/isr/on-demand");
+    expect(second.headers()["x-nextjs-cache"]).toBe("HIT");
+    expect(await second.text()).toContain(`ok:${runtimeEnv.APP_NAME}`);
   });
 });
 

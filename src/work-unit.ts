@@ -10,6 +10,18 @@ export function currentWorkUnit(): WorkUnitStore | undefined {
   return workUnitAsyncStorage.getStore();
 }
 
+const cacheStores: ReadonlySet<string> = new Set([
+  "cache",
+  "private-cache",
+  "unstable-cache",
+]);
+
+export function isCacheScope(
+  unit: WorkUnitStore | undefined = currentWorkUnit(),
+): boolean {
+  return unit !== undefined && cacheStores.has(unit.type);
+}
+
 const buildLikePrerenders: ReadonlySet<string> = new Set([
   "prerender",
   "prerender-ppr",

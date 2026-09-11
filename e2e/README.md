@@ -56,6 +56,7 @@ would silently test the build before it.
 | `/render-guard/dynamic` | `get()` during a dynamic render, which captures nothing      |
 | `/isr/[slug]`           | `get()` during an ISR prerender on the running server        |
 | `/lazy-import`          | a module-scope read in a module a component imports lazily   |
+| `/lazy-import/static`   | the same read, in a page the build prerenders                |
 | `/prefetch`             | a link whose prefetch reaches `/prefetch/target` first       |
 | `/prefetch/target`      | module-scope reads in a page below a loading boundary        |
 | `/async-env`            | `space.getAsync()` on an otherwise static route              |
@@ -72,6 +73,7 @@ would silently test the build before it.
 | `/soft-nav`             | a client-side navigation into the layouts that publish       |
 | `/guards`               | every misuse the API rejects, and how it words it            |
 | `/contexts/*`           | the rows of the README table "Where each read works"         |
+| `/contexts/client`      | the client rows: module scope, an effect, a click handler    |
 
 The routes under `(published)` sit below a layout that renders `<ClientEnvScript />`;
 the ones under `(bare)` do not, which is what lets `/render-guard` be prerendered
@@ -84,8 +86,11 @@ group's `error.tsx` is what the browser shows.
 
 `/contexts/*` and `/api/contexts/*` each put both reads into one context of the
 README table — `generateMetadata`, `generateStaticParams`, a `force-static` Route
-Handler, `instrumentation.ts`, `src/proxy.ts` — and report `ok:<value>` or
+Handler, `unstable_cache()` filled at build and by the running server,
+`instrumentation.ts`, `src/proxy.ts` — and report `ok:<value>` or
 `err:<message>` instead of throwing, so the spec can assert on the outcome.
+`/contexts/client` does the same in the browser, from the module scope of a
+client module, from an effect and from a click handler.
 `src/instrumentation-client.ts` does the same in the browser and parks the result
 on `window`, which the spec reads on a published, a provided and a bare page, and on the
 error document of `/broken`.
@@ -98,5 +103,7 @@ of the segment configs the mode rejects, and the specs assert per route what
 made it into the static shell and what streams in at request time —
 `/client` deliberately bakes a synchronous client read into its shell to pin
 down the documented capture-then-heal behavior.
-`/contexts/use-cache` reads inside a `"use cache"` function, where `getAsync()`
-captures the build value — the row of the README table only this fixture can test.
+`/contexts/use-cache` reads inside a `"use cache"` function while the build fills
+the cache — the row of the README table only this fixture can test — and
+`/contexts/use-cache/runtime` inside one the running server fills, where both
+reads go through.

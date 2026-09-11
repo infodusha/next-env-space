@@ -49,11 +49,11 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * Reads a single variable inside a Server Component. Opts the render out of
    * prerendering first, so the value is always the one of the running server.
    * Where Next has no request to attach to — module scope of a server module,
-   * `register()` in instrumentation.ts — there is no prerender either, so it
-   * resolves with what the synchronous `get` reads there. Throws where there
-   * is nothing to opt out of and `next build` would capture the value all the
-   * same: `generateStaticParams`, a cached function, a Route Handler it
-   * prerenders.
+   * `register()` in instrumentation.ts, a cached function the running server
+   * fills — there is no prerender either, so it resolves with what the
+   * synchronous `get` reads there. Throws where there is nothing to opt out
+   * of and `next build` would capture the value all the same:
+   * `generateStaticParams`, a cached function, a Route Handler it prerenders.
    */
   getAsync<TKey extends keyof TSchema>(
     key: TKey,

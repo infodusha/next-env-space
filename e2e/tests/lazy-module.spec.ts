@@ -1,6 +1,10 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 import { expect, test } from "@playwright/test";
 
 import { runtimeEnv } from "../env.js";
+import { fixtureDir } from "../paths.js";
 
 /**
  * A module that Next imports lazily inside a render runs its module scope in
@@ -17,6 +21,38 @@ test.describe("a module-scope read in a module a dynamic import() loads", () => 
 
     await expect(page.getByTestId("lazy-app-name")).toHaveText(
       `ok:${runtimeEnv.APP_NAME}`,
+    );
+  });
+});
+
+test.describe("a module-scope read in a module a dynamic import() loads at build", () => {
+  const guardMessage =
+    "is called while prerendering, so its value would be baked into the build output";
+
+  test("is rejected by the render guard, into the static page", async ({
+    page,
+  }) => {
+    // A dynamic render captures nothing, but this one is the build's: the
+    // module scope runs inside the prerender, so the guard has to throw, and
+    // the message — not a value — is what the static HTML holds.
+    const staticPage = path.join(
+      fixtureDir,
+      ".next",
+      "server",
+      "app",
+      "lazy-import",
+      "static.html",
+    );
+    expect(existsSync(staticPage)).toBe(true);
+    expect(readFileSync(staticPage, "utf8")).toContain(guardMessage);
+
+    await page.goto("/lazy-import/static");
+
+    await expect(page.getByTestId("lazy-static-app-name")).toContainText(
+      "err:",
+    );
+    await expect(page.getByTestId("lazy-static-app-name")).toContainText(
+      guardMessage,
     );
   });
 });

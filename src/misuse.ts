@@ -1,12 +1,6 @@
-import { currentWorkUnit, isBuildTime } from "./work-unit.js";
+import { currentWorkUnit, isBuildTime, isCacheScope } from "./work-unit.js";
 
 type Misuse = "generate-static-params" | "cached-function" | "static-route";
-
-const cacheStores: ReadonlySet<string> = new Set([
-  "cache",
-  "private-cache",
-  "unstable-cache",
-]);
 
 function detectMisuse(): Misuse | null {
   const unit = currentWorkUnit();
@@ -22,7 +16,7 @@ function detectMisuse(): Misuse | null {
     return null;
   }
 
-  if (cacheStores.has(unit.type)) {
+  if (isCacheScope(unit)) {
     return "cached-function";
   }
 

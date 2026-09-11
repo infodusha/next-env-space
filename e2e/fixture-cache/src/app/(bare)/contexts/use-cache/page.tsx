@@ -1,4 +1,4 @@
-import { publicEnv } from "@/env";
+import { readBoth, type Reads } from "@/contexts";
 
 /**
  * Inside "use cache" the body runs once, during the build, and its return
@@ -6,12 +6,9 @@ import { publicEnv } from "@/env";
  * names the cached function, so the trap of a captured value never opens; the
  * messages themselves are what gets cached and rendered here.
  */
-async function readInCache(): Promise<{ sync: string; async: string }> {
+async function readInCache(): Promise<Reads> {
   "use cache";
-  return {
-    sync: attempt(() => publicEnv.get("APP_NAME")),
-    async: await attemptAsync(),
-  };
+  return await readBoth();
 }
 
 export default async function Page() {
@@ -22,24 +19,4 @@ export default async function Page() {
       <p data-testid="use-cache-async">{reads.async}</p>
     </section>
   );
-}
-
-function attempt(read: () => string): string {
-  try {
-    return `ok:${read()}`;
-  } catch (error) {
-    return `err:${describe(error)}`;
-  }
-}
-
-async function attemptAsync(): Promise<string> {
-  try {
-    return `ok:${await publicEnv.getAsync("APP_NAME")}`;
-  } catch (error) {
-    return `err:${describe(error)}`;
-  }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

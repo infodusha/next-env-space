@@ -14,6 +14,7 @@ import { fixtureDir } from "../paths.js";
  */
 const guardMessage =
   "is called while prerendering, so its value would be baked into the build output";
+const cachedFunctionMessage = "is called inside a cached function";
 
 const appDir = path.join(fixtureDir, ".next", "server", "app");
 
@@ -61,6 +62,44 @@ test.describe("a force-static Route Handler", () => {
     expect(reads.sync).toContain("while Next prerenders it at build time");
     expect(reads.sync).toContain("captured into the static response");
     expect(reads.async).toContain("while Next prerenders it at build time");
+  });
+});
+
+test.describe("unstable_cache()", () => {
+  test("both reads are rejected while the build fills the cache", async ({
+    page,
+  }) => {
+    await page.goto("/contexts/unstable-cache");
+
+    await expect(page.getByTestId("unstable-cache-sync")).toContainText(
+      cachedFunctionMessage,
+    );
+    await expect(page.getByTestId("unstable-cache-sync")).toContainText(
+      "pass it in as an argument",
+    );
+    await expect(page.getByTestId("unstable-cache-async")).toContainText(
+      cachedFunctionMessage,
+    );
+    expect(
+      existsSync(path.join(appDir, "contexts", "unstable-cache.html")),
+    ).toBe(true);
+  });
+
+  test("a cache miss on the running server reads the runtime value, and is cached", async ({
+    request,
+  }) => {
+    const first = (await (
+      await request.get("/api/contexts/unstable-cache")
+    ).json()) as { sync: string; async: string; token: string };
+
+    expect(first.sync).toBe(`ok:${runtimeEnv.APP_NAME}`);
+    expect(first.async).toBe(`ok:${runtimeEnv.APP_NAME}`);
+    expect(first.token).toMatch(/^[0-9a-f-]{36}$/u);
+
+    const second = await (
+      await request.get("/api/contexts/unstable-cache")
+    ).json();
+    expect(second).toEqual(first);
   });
 });
 
@@ -144,5 +183,59 @@ test.describe("instrumentation-client.ts", () => {
     await expect
       .poll(() => errors.filter((message) => message.includes(failedMessage)))
       .toHaveLength(1);
+  });
+});
+
+test.describe("a Client Component, outside the render", () => {
+  test("both reads work in an effect and in a handler, with the script", async ({
+    page,
+  }) => {
+    await page.goto("/contexts/client");
+
+    await expect(page.getByTestId("client-effect-sync")).toHaveText(
+      `ok:${runtimeEnv.APP_NAME}`,
+    );
+    await expect(page.getByTestId("client-effect-async")).toHaveText(
+      `ok:${runtimeEnv.APP_NAME}`,
+    );
+
+    await page.getByRole("button", { name: "read in a handler" }).click();
+
+    await expect(page.getByTestId("client-handler-sync")).toHaveText(
+      `ok:${runtimeEnv.APP_NAME}`,
+    );
+    await expect(page.getByTestId("client-handler-async")).toHaveText(
+      `ok:${runtimeEnv.APP_NAME}`,
+    );
+  });
+});
+
+test.describe("module scope of a client module", () => {
+  // The module runs on the server, in the SSR pass, and again in the browser,
+  // so the values have to agree on both sides, or hydration reports it.
+  test("both reads hold the runtime value, with the script, and hydrate cleanly", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        errors.push(message.text());
+      }
+    });
+    page.on("pageerror", (error) => errors.push(error.message));
+
+    await page.goto("/contexts/client");
+
+    await expect(page.getByTestId("client-module-scope-sync")).toHaveText(
+      runtimeEnv.APP_NAME,
+    );
+    await expect(page.getByTestId("client-module-scope-async")).toHaveText(
+      runtimeEnv.APP_NAME,
+    );
+    // The effect only runs once the page has hydrated.
+    await expect(page.getByTestId("client-effect-sync")).toHaveText(
+      `ok:${runtimeEnv.APP_NAME}`,
+    );
+    expect(errors).toEqual([]);
   });
 });

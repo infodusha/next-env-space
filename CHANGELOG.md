@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.1](https://github.com/infodusha/next-env-space/compare/v3.2.0...v3.2.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* throw from get() only in a build-time prerender ([de9f483](https://github.com/infodusha/next-env-space/commit/de9f483918e8c9dec9de3517856b78f9e1919ee3))
+
 ## [3.2.0](https://github.com/infodusha/next-env-space/compare/v3.1.0...v3.2.0) (2026-09-11)
 
 

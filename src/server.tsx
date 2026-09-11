@@ -28,7 +28,14 @@ export async function ClientEnvScript<TSchema extends EnvSchema>({
   nonce,
 }: ClientEnvScriptProps<TSchema>) {
   const rawEnv = await readRawValues(space);
-  return <EnvScript name={space.name} rawEnv={rawEnv} nonce={nonce} />;
+  return (
+    <EnvScript
+      name={space.name}
+      rawEnv={rawEnv}
+      nonce={nonce}
+      failure={describeFailure(space)}
+    />
+  );
 }
 
 export interface ClientEnvProviderProps<TSchema extends EnvSchema> {
@@ -51,6 +58,7 @@ export async function ClientEnvProvider<TSchema extends EnvSchema>({
   children,
 }: ClientEnvProviderProps<TSchema>) {
   const rawEnv = await readRawValues(space);
+  readEnvSpace(space);
   return (
     <EnvProvider name={space.name} rawEnv={rawEnv}>
       {children}
@@ -62,6 +70,16 @@ async function readRawValues<TSchema extends EnvSchema>(
   space: EnvSpace<TSchema>,
 ): Promise<RawEnv> {
   await optOutOfPrerender();
-  readEnvSpace(space);
   return Object.fromEntries(space.keys.map((key) => [key, process.env[key]]));
+}
+
+function describeFailure<TSchema extends EnvSchema>(
+  space: EnvSpace<TSchema>,
+): string | undefined {
+  try {
+    readEnvSpace(space);
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
 }

@@ -217,6 +217,14 @@ In the table, _the script_ is `<ClientEnvScript />` and _the provider_ is `<Clie
 | `generateStaticParams`                                 | ⚠️ **build-time value**  | ❌ throws                                                        |
 | inside a `"use cache"` function                        | ❌ throws                | ⚠️ **build-time value**                                          |
 
+A read at module scope of `instrumentation-client.ts` runs before Next boots the page, so a
+throw there stops the boot and hides every error Next would otherwise show, this one included:
+a blank page and a console message are all that is left. On a page that does not publish the
+space that is what happens — catch the read there, or read where the value is used. On the
+error document Next serves when a server render fails, `get()` and `getAll()` answer
+`undefined` instead and report the missing space once the page has booted, so that Next gets
+to show the failure that caused it; `getAsync()` rejects as usual.
+
 ## Cache Components
 
 With `cacheComponents` on, `getAsync`, `<ClientEnvScript />` and `<ClientEnvProvider />` all become
@@ -360,6 +368,8 @@ build.
   they declare the same keys — a hot reload re-creates a space this way — and an error as
   soon as they do not: a warning in development, a thrown error in production.
 - `ClientEnvScript` parses the space on the server before serialising it, so a missing or
-  malformed value fails there rather than in the browser at the first read.
+  malformed value fails the render there rather than in the browser at the first read. The
+  raw values still reach the browser, ahead of the failure, so a read there fails on the same
+  message instead of reporting the space missing.
 - Do not use the `NEXT_PUBLIC_` prefix: those are inlined at build time, which is exactly
   what this package avoids.

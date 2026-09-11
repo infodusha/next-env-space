@@ -1,3 +1,4 @@
+import { errorDocumentReadError, isErrorDocument } from "./error-document.js";
 import { envSpacesKey, type RawEnv } from "./global.js";
 
 export interface EnvRuntime {
@@ -25,6 +26,10 @@ export function readRawEnv(
     return provided;
   }
 
+  if (isErrorDocument()) {
+    throw errorDocumentReadError(name);
+  }
+
   throw new Error(
     `Env space "${name}" is missing on the client. ` +
       `Render <ClientEnvScript space={...} /> or <ClientEnvProvider space={...}> from ` +
@@ -44,6 +49,10 @@ function readProvidedEnv(
   try {
     return read(name);
   } catch {
+    if (isErrorDocument()) {
+      throw errorDocumentReadError(name);
+    }
+
     throw new Error(
       `getAsync() of the "${name}" env space was called outside of a render, ` +
         `where the <ClientEnvProvider> context cannot be read. Publish the space with ` +

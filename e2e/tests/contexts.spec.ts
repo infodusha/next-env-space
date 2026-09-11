@@ -123,4 +123,26 @@ test.describe("instrumentation-client.ts", () => {
     expect(reads?.sync).toContain(missingMessage);
     expect(reads?.async).toContain(outsideRenderMessage);
   });
+
+  // /broken publishes another space and fails on it, so Next serves its error
+  // document, without a script in it. A throw at module scope would stop the
+  // boot that shows the failure, so get() answers undefined there and the error
+  // is reported once the page has booted; getAsync() rejects as usual.
+  test("get() answers undefined on the error document and reports it after the boot", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const failedMessage =
+      "the server render of this page failed before its shell was ready";
+
+    const reads = await readsOn(page, "/broken");
+
+    expect(reads?.sync).toBe("ok:undefined");
+    expect(reads?.async).toContain(failedMessage);
+    await expect(page.getByTestId("broken-boundary")).toBeVisible();
+    await expect
+      .poll(() => errors.filter((message) => message.includes(failedMessage)))
+      .toHaveLength(1);
+  });
 });

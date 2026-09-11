@@ -53,3 +53,15 @@ export const providedNestedEnv = createEnvSpace(
   },
   { name: "provided-nested" },
 );
+
+/**
+ * Published by the `(broken)` layout, but backed by a value the schema rejects:
+ * the raw value still has to reach the browser, so a read there fails on the
+ * validation error rather than on a missing space.
+ */
+export const brokenPublicEnv = createEnvSpace(
+  {
+    BROKEN_URL: z.url(),
+  },
+  { name: "broken-public" },
+);

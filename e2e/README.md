@@ -61,6 +61,7 @@ would silently test the build before it.
 | `/api/env`              | `get()` and `getAsync()` in a Route Handler               |
 | `/api/broken`           | a value the schema rejects                                |
 | `/api/broken-pair`      | two bad values, reported in one error                     |
+| `/broken`               | a published space whose value the schema rejects          |
 | `/provided`             | a space carried by `<ClientEnvProvider />` context alone  |
 | `/provided-late`        | the same space read after the render, which has to fail   |
 | `/soft-nav`             | a client-side navigation into the layouts that publish    |
@@ -72,14 +73,17 @@ the ones under `(bare)` do not, which is what lets `/render-guard` be prerendere
 at build time, `/async-env` prove that the prerender opt-out really ran, and
 `/soft-nav` reach that layout for the first time from the browser. The ones under
 `(provided)` sit below two nested `<ClientEnvProvider />` instead, so no inline script
-reaches them at all.
+reaches them at all. `/broken` sits under `(broken)`, whose layout publishes a space the
+schema rejects: the render fails on the server and Next serves its error document, so the
+group's `error.tsx` is what the browser shows.
 
 `/contexts/*` and `/api/contexts/*` each put both reads into one context of the
 README table — `generateMetadata`, `generateStaticParams`, a `force-static` Route
 Handler, `instrumentation.ts`, `src/proxy.ts` — and report `ok:<value>` or
 `err:<message>` instead of throwing, so the spec can assert on the outcome.
 `src/instrumentation-client.ts` does the same in the browser and parks the result
-on `window`, which the spec reads on a published, a provided and a bare page.
+on `window`, which the spec reads on a published, a provided and a bare page, and on the
+error document of `/broken`.
 
 ## Routes of the cache fixture
 

@@ -1,7 +1,11 @@
-import * as react from "react";
-
+import { isErrorDocumentReadError, reportAfterBoot } from "./error-document.js";
+import {
+  assertKnownKey,
+  assertNotInRender,
+  assertOptedOut,
+  claimName,
+} from "./guards.js";
 import { parseEnv } from "./parse.js";
-import { isProduction } from "./process-env.js";
 import { readRawEnv, type EnvRuntime } from "./raw-env.js";
 import { isMissingRequestScope } from "./request-scope.js";
 import type { EnvSchema, ParsedEnv } from "./schema.js";
@@ -31,7 +35,10 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * Route Handlers and in Server Actions. Throws inside a Server Component
    * render, a dynamic one included, where the value could be captured at build
    * time — use `getAsync` there. Throws as well on a key the schema has not
-   * declared.
+   * declared, and on a space that did not reach the browser — except on the
+   * error document Next serves for a failed server render, where it answers
+   * `undefined` and reports the missing space once the page has booted, so a
+   * read at module scope of instrumentation-client.ts does not stop that boot.
    */
   get<TKey extends keyof TSchema>(key: TKey): ParsedEnv<TSchema>[TKey];
   /** Reads the whole space at once, with the same rules as `get`. */
@@ -98,10 +105,6 @@ export interface CreateEnvSpace {
   ): EnvSpace<TSchema>;
 }
 
-const takenSpaces = new Map<string, readonly string[]>();
-
-const warnedSpaces = new Set<string>();
-
 const readers = new WeakMap<object, () => unknown>();
 
 export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
@@ -114,8 +117,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       Object.keys(schema) as (keyof TSchema & string)[],
     );
 
-    assertUniqueName(name, keys);
-    takenSpaces.set(name, keys);
+    claimName(name, keys);
 
     let cachedEnv: ParsedEnv<TSchema> | null = null;
 
@@ -128,9 +130,27 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       return cachedEnv;
     }
 
+    function readSyncEnv(): ParsedEnv<TSchema> | undefined {
+      try {
+        return readAllEnv(false);
+      } catch (error) {
+        if (!isErrorDocumentReadError(error)) {
+          throw error;
+        }
+        reportAfterBoot(name, error);
+        return undefined;
+      }
+    }
+
+    function noValues(): ParsedEnv<TSchema> {
+      return Object.freeze(
+        Object.fromEntries(keys.map((key) => [key, undefined])),
+      ) as never;
+    }
+
     function getAll(): ParsedEnv<TSchema> {
       assertNotInRender(name, "getAll()");
-      return readAllEnv(false);
+      return readSyncEnv() ?? noValues();
     }
 
     function get<TKey extends keyof TSchema>(
@@ -138,7 +158,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     ): ParsedEnv<TSchema>[TKey] {
       assertKnownKey(schema, name, key);
       assertNotInRender(name, `get('${String(key)}')`);
-      return readAllEnv(false)[key];
+      return readSyncEnv()?.[key] as ParsedEnv<TSchema>[TKey];
     }
 
     const settledReads = new Map<keyof TSchema | null, Promise<unknown>>();
@@ -216,81 +236,4 @@ export function readEnvSpace<TSchema extends EnvSchema>(
     );
   }
   return read() as ParsedEnv<TSchema>;
-}
-
-function assertUniqueName(name: string, keys: readonly string[]): void {
-  const taken = takenSpaces.get(name);
-  if (taken === undefined || sameKeys(taken, keys)) {
-    return;
-  }
-
-  const message =
-    `Env space "${name}" is created twice with different keys. ` +
-    `The one that reaches the browser last replaces the other, so every read of that other one fails. ` +
-    `Pass a unique "name" option to createEnvSpace().`;
-
-  if (isProduction()) {
-    throw new Error(message);
-  }
-
-  if (warnedSpaces.has(name)) {
-    return;
-  }
-  warnedSpaces.add(name);
-  console.warn(message);
-}
-
-function sameKeys(taken: readonly string[], keys: readonly string[]): boolean {
-  return (
-    taken.length === keys.length && keys.every((key) => taken.includes(key))
-  );
-}
-
-function assertKnownKey(
-  schema: EnvSchema,
-  name: string,
-  key: PropertyKey,
-): void {
-  if (Object.hasOwn(schema, key)) {
-    return;
-  }
-
-  const known = Object.keys(schema);
-  throw new Error(
-    `Key "${String(key)}" is not in the "${name}" env space. ` +
-      (known.length === 0
-        ? "The space has no keys."
-        : `It has ${known.join(", ")}.`),
-  );
-}
-
-function isServerRender(): boolean {
-  return (
-    typeof react.cacheSignal === "function" && react.cacheSignal() !== null
-  );
-}
-
-function assertNotInRender(name: string, call: string): void {
-  if (typeof window !== "undefined" || !isServerRender()) {
-    return;
-  }
-
-  throw new Error(
-    `${call} of the "${name}" env space is called while rendering, so its value can be captured at build time. ` +
-      `Use getAsync() instead, or move the read out of the render — a Route Handler, a Server Action, instrumentation.ts. ` +
-      `Inside a "use cache" function neither works: pass the value in as an argument.`,
-  );
-}
-
-function assertOptedOut(runtime: EnvRuntime, name: string): void {
-  if (runtime.optsOutInReactServer || !isServerRender()) {
-    return;
-  }
-
-  throw new Error(
-    `getAsync() of the "${name}" env space could not opt the render out of prerendering: ` +
-      `"next-env-space" was resolved without the "react-server" export condition, leaving it ` +
-      `with io(), which is only a boundary under cacheComponents. ` +
-      `Turn cacheComponents on, or find what resolves the package without that condition.`,
-  );
 }

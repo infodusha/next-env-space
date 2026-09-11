@@ -12,9 +12,10 @@ interface EnvScriptProps {
   readonly name: string;
   readonly rawEnv: RawEnv;
   readonly nonce?: string | undefined;
+  readonly failure?: string | undefined;
 }
 
-export function EnvScript({ name, rawEnv, nonce }: EnvScriptProps) {
+export function EnvScript({ name, rawEnv, nonce, failure }: EnvScriptProps) {
   const hasFlushed = useRef(false);
 
   publishToWindow(name, rawEnv);
@@ -34,6 +35,10 @@ export function EnvScript({ name, rawEnv, nonce }: EnvScriptProps) {
       />
     );
   });
+
+  if (failure !== undefined) {
+    throw new Error(failure);
+  }
 
   return null;
 }

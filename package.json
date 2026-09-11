@@ -55,13 +55,15 @@
   "scripts": {
     "build": "npm run clean && tsc",
     "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit && tsc -p e2e/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc -p e2e/tsconfig.json && tsc -p unit/tsconfig.json",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "prepublishOnly": "npm run build",
-    "test": "tsc -p tsconfig.typetest.json",
+    "test": "npm run test:types && npm run test:unit",
+    "test:types": "tsc -p tsconfig.typetest.json",
+    "test:unit": "npm run build && node --import next/dist/server/node-environment-baseline.js --test \"unit/**/*.test.ts\"",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:ui": "npm run build && playwright test --ui",
     "prepare": "husky"

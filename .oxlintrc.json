@@ -44,7 +44,7 @@
       }
     },
     {
-      "files": ["e2e/**"],
+      "files": ["e2e/**", "unit/**"],
       "rules": {
         "eslint/no-underscore-dangle": "off"
       }

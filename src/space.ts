@@ -5,6 +5,7 @@ import {
   assertOptedOut,
   claimName,
 } from "./guards.js";
+import { assertNotMisused } from "./misuse.js";
 import { parseEnv } from "./parse.js";
 import { readRawEnv, type EnvRuntime } from "./raw-env.js";
 import { isMissingRequestScope } from "./request-scope.js";
@@ -32,10 +33,11 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
   readonly schema: TSchema;
   /**
    * Reads a single variable. Safe at module scope, in client components, in
-   * Route Handlers and in Server Actions. Throws inside a Server Component
-   * render, a dynamic one included, where the value could be captured at build
-   * time — use `getAsync` there. Throws as well on a key the schema has not
-   * declared, and on a space that did not reach the browser — except on the
+   * Route Handlers and in Server Actions. Throws where `next build` would
+   * capture the value — a Server Component it prerenders, `generateStaticParams`,
+   * a cached function, a Route Handler it prerenders; use `getAsync` in the
+   * component. Throws as well on a key the schema has not declared, and on a
+   * space that did not reach the browser — except on the
    * error document Next serves for a failed server render, where it answers
    * `undefined` and reports the missing space once the page has booted, so a
    * read at module scope of instrumentation-client.ts does not stop that boot.
@@ -48,7 +50,10 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * prerendering first, so the value is always the one of the running server.
    * Where Next has no request to attach to — module scope of a server module,
    * `register()` in instrumentation.ts — there is no prerender either, so it
-   * resolves with what the synchronous `get` reads there.
+   * resolves with what the synchronous `get` reads there. Throws where there
+   * is nothing to opt out of and `next build` would capture the value all the
+   * same: `generateStaticParams`, a cached function, a Route Handler it
+   * prerenders.
    */
   getAsync<TKey extends keyof TSchema>(
     key: TKey,
@@ -149,6 +154,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     }
 
     function getAll(): ParsedEnv<TSchema> {
+      assertNotMisused(name, "getAll()");
       assertNotInRender(name, "getAll()");
       return readSyncEnv() ?? noValues();
     }
@@ -157,16 +163,21 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
       key: TKey,
     ): ParsedEnv<TSchema>[TKey] {
       assertKnownKey(schema, name, key);
-      assertNotInRender(name, `get('${String(key)}')`);
+      const call = `get('${String(key)}')`;
+      assertNotMisused(name, call);
+      assertNotInRender(name, call);
       return readSyncEnv()?.[key] as ParsedEnv<TSchema>[TKey];
     }
 
     const settledReads = new Map<keyof TSchema | null, Promise<unknown>>();
 
     function readAsync<TValue>(
+      call: string,
       key: keyof TSchema | null,
       pick: (env: ParsedEnv<TSchema>) => TValue,
     ): Promise<TValue> {
+      assertNotMisused(name, call);
+
       let optedOut: Promise<void>;
       try {
         optedOut = runtime.optOutOfPrerender();
@@ -200,14 +211,14 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     }
 
     function getAllAsync(): Promise<ParsedEnv<TSchema>> {
-      return readAsync(null, (env) => env);
+      return readAsync("getAllAsync()", null, (env) => env);
     }
 
     function getAsync<TKey extends keyof TSchema>(
       key: TKey,
     ): Promise<ParsedEnv<TSchema>[TKey]> {
       assertKnownKey(schema, name, key);
-      return readAsync(key, (env) => env[key]);
+      return readAsync(`getAsync('${String(key)}')`, key, (env) => env[key]);
     }
 
     const space = {

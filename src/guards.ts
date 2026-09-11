@@ -1,9 +1,9 @@
 import * as react from "react";
 
-import { isBuildTimeRender } from "./build-time.js";
 import { isProduction } from "./process-env.js";
 import type { EnvRuntime } from "./raw-env.js";
 import type { EnvSchema } from "./schema.js";
+import { isBuildTime } from "./work-unit.js";
 
 const takenSpaces = new Map<string, readonly string[]>();
 
@@ -64,11 +64,7 @@ function isServerRender(): boolean {
 }
 
 export function assertNotInRender(name: string, call: string): void {
-  if (
-    typeof window !== "undefined" ||
-    !isServerRender() ||
-    !isBuildTimeRender()
-  ) {
+  if (typeof window !== "undefined" || !isServerRender() || !isBuildTime()) {
     return;
   }
 

@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { buildTimeEnv, runtimeEnv } from "../env.js";
+import { runtimeEnv } from "../env.js";
 import { fixtureDir } from "../paths.js";
 
 /**
@@ -40,10 +40,10 @@ test.describe("generateMetadata", () => {
 });
 
 test.describe("generateStaticParams", () => {
-  test("get() answers with the build-time value, getAsync() throws", async ({
+  test("both reads are rejected by the guard that names it", async ({
     request,
   }) => {
-    const slug = `sync-ok-${buildTimeEnv.APP_NAME}--async-err`;
+    const slug = "sync-guarded--async-guarded";
     const response = await request.get(`/contexts/static-params/${slug}`);
 
     expect(response.status()).toBe(200);
@@ -52,15 +52,15 @@ test.describe("generateStaticParams", () => {
 });
 
 test.describe("a force-static Route Handler", () => {
-  test("bakes the build-time value in through both reads", async ({
+  test("both reads are rejected while the response is prerendered at build", async ({
     request,
   }) => {
     const response = await request.get("/api/contexts/static-route");
+    const reads = (await response.json()) as { sync: string; async: string };
 
-    expect(await response.json()).toEqual({
-      sync: `ok:${buildTimeEnv.APP_NAME}`,
-      async: `ok:${buildTimeEnv.APP_NAME}`,
-    });
+    expect(reads.sync).toContain("while Next prerenders it at build time");
+    expect(reads.sync).toContain("captured into the static response");
+    expect(reads.async).toContain("while Next prerenders it at build time");
   });
 });
 

@@ -46,6 +46,17 @@ test.describe("get() inside a prerender on the running server", () => {
     expect(second.headers()["x-nextjs-cache"]).toBe("HIT");
     expect(await second.text()).toContain(`ok:${runtimeEnv.APP_NAME}`);
   });
+
+  test("ISR Route Handler on demand: answers the runtime value, and the response is cached", async ({
+    request,
+  }) => {
+    const first = await request.get("/api/isr/on-demand");
+    expect(first.status()).toBe(200);
+    expect(await first.json()).toEqual({ sync: `ok:${runtimeEnv.APP_NAME}` });
+
+    const second = await request.get("/api/isr/on-demand");
+    expect(second.headers()["x-nextjs-cache"]).toBe("HIT");
+  });
 });
 
 test.describe("prerendering", () => {

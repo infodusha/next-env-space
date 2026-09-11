@@ -2,9 +2,9 @@ import { publicEnv } from "@/env";
 
 /**
  * Inside "use cache" the body runs once, during the build, and its return
- * value is what every request gets. `get()` is caught by the render guard;
- * `getAsync()` is not — `io()` is no boundary inside a cache scope — so it
- * captures the build machine's value, which is the trap the README names.
+ * value is what every request gets. Both reads are rejected by the guard that
+ * names the cached function, so the trap of a captured value never opens; the
+ * messages themselves are what gets cached and rendered here.
  */
 async function readInCache(): Promise<{ sync: string; async: string }> {
   "use cache";

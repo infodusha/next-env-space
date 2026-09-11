@@ -1,26 +1,29 @@
 import { expect, test } from "@playwright/test";
 
-import { buildTimeEnv } from "../env.js";
-
 /**
  * The "use cache" row of the README table: the body runs during the build and
- * its result is cached, so the guard stops `get()` but `getAsync()` captures
- * the build machine's value — the one trap the package cannot detect.
+ * its result is cached, so a read there could only capture the build
+ * machine's value — both reads are rejected by the guard that says so.
  */
+const guardMessage = "is called inside a cached function";
+
 test.describe('a read inside a "use cache" function', () => {
-  test("get() is caught by the render guard", async ({ page }) => {
+  test("get() is rejected by the cached-function guard", async ({ page }) => {
     await page.goto("/contexts/use-cache");
 
     await expect(page.getByTestId("use-cache-sync")).toContainText(
-      "is called while prerendering, so its value would be baked into the build output",
+      guardMessage,
+    );
+    await expect(page.getByTestId("use-cache-sync")).toContainText(
+      "pass it in as an argument",
     );
   });
 
-  test("getAsync() captures the build-time value", async ({ page }) => {
+  test("getAsync() is rejected the same way", async ({ page }) => {
     await page.goto("/contexts/use-cache");
 
-    await expect(page.getByTestId("use-cache-async")).toHaveText(
-      `ok:${buildTimeEnv.APP_NAME}`,
+    await expect(page.getByTestId("use-cache-async")).toContainText(
+      guardMessage,
     );
   });
 });

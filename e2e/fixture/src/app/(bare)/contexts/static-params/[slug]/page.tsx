@@ -3,7 +3,8 @@ import { readAsync, readSync } from "@/contexts";
 /**
  * generateStaticParams runs at build only, so its outcome can only leave the
  * build as a route: the one slug it emits spells out what each read did —
- * `sync-ok-<value>--async-err`. Everything else is a 404.
+ * `guarded` when the guard named generateStaticParams in its refusal.
+ * Everything else is a 404.
  */
 export async function generateStaticParams(): Promise<{ slug: string }[]> {
   const sync = tag("sync", readSync());
@@ -23,7 +24,10 @@ export default async function Page({
 }
 
 function tag(label: string, result: string): string {
-  return result.startsWith("ok:")
-    ? `${label}-ok-${result.slice("ok:".length)}`
+  if (result.startsWith("ok:")) {
+    return `${label}-ok-${result.slice("ok:".length)}`;
+  }
+  return result.includes("generateStaticParams")
+    ? `${label}-guarded`
     : `${label}-err`;
 }

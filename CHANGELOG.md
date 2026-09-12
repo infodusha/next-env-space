@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.3.0](https://github.com/infodusha/next-env-space/compare/v3.2.1...v3.3.0) (2026-09-12)
+
+
+### Features
+
+* refactor & simplify code ([ad02ccd](https://github.com/infodusha/next-env-space/commit/ad02ccd870141f1fd06a046dc749d09acfe0153c))
+* throw at misuse ([4fc6ad3](https://github.com/infodusha/next-env-space/commit/4fc6ad3086fdee1cdf2b30d673a5f34f715c7eb0))
+
+
+### Bug Fixes
+
+* handle unstable_cache behavior ([5b50213](https://github.com/infodusha/next-env-space/commit/5b5021371c6cb80f13b0d4e95f637729ac968fbb))
+
 ## [3.2.1](https://github.com/infodusha/next-env-space/compare/v3.2.0...v3.2.1) (2026-09-11)
 
 

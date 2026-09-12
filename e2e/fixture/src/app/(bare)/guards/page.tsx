@@ -10,13 +10,22 @@ import { publicEnv } from "@/env";
  */
 export const dynamic = "force-dynamic";
 
-export default async function GuardsPage() {
+export default function GuardsPage() {
   const guards: Record<string, string> = {
-    "async-schema": await messageAsync(() =>
+    "async-schema": message(() =>
       createEnvSpace(
         { APP_NAME: z.string().refine(() => Promise.resolve(true)) },
         { name: "guard-async" },
-      ).getAsync("APP_NAME"),
+      ).get("APP_NAME"),
+    ),
+    "async-schema-all": message(() =>
+      createEnvSpace(
+        {
+          APP_NAME: z.string().refine(() => Promise.resolve(true)),
+          FEATURE_LABEL: z.string().refine(() => Promise.resolve(true)),
+        },
+        { name: "guard-async-all" },
+      ).getAll(),
     ),
     "duplicate-name": message(() => {
       createEnvSpace({ GUARD_A: z.string() }, { name: "guard-duplicate" });
@@ -43,15 +52,6 @@ export default async function GuardsPage() {
 function message(run: () => unknown): string {
   try {
     run();
-    return "no error";
-  } catch (error) {
-    return describe(error);
-  }
-}
-
-async function messageAsync(run: () => Promise<unknown>): Promise<string> {
-  try {
-    await run();
     return "no error";
   } catch (error) {
     return describe(error);

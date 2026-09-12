@@ -51,6 +51,20 @@ const mixedEnv = createEnvSpace(
   { name: "mixed" },
 );
 
+// 4. a schema that validates asynchronously — an async refinement or transform.
+// Standard Schema does not tell it apart in the types, so the reads type the
+// same way; at runtime only getAsync() and getAllAsync() answer such a key.
+const asyncEnv = createEnvSpace(
+  {
+    DATABASE_URL: z
+      .url()
+      .refine((url) => Promise.resolve(url.startsWith("postgres"))),
+    SHARDS: z.coerce.number().transform((count) => Promise.resolve(count * 2)),
+    LOG_LEVEL: z.enum(["debug", "info"]).default("info"),
+  },
+  { name: "async" },
+);
+
 const appName: string = publicEnv.get("APP_NAME");
 const appVersion: string | undefined = publicEnv.get("APP_VERSION");
 const timeout: number = publicEnv.get("REQUEST_TIMEOUT_SECONDS");
@@ -166,7 +180,22 @@ async function methods() {
   const asyncPort: number = await mixedEnv.getAsync("PORT");
   // @ts-expect-error unknown key
   await publicEnv.getAsync("NOPE");
-  return [name, everythingFlag, asyncPort, sameShape, bothWays] as const;
+  // The output type of an async transform is what it resolves to.
+  const databaseUrl: string = await asyncEnv.getAsync("DATABASE_URL");
+  const shards: number = await asyncEnv.getAsync("SHARDS");
+  const asyncAll: InferEnv<typeof asyncEnv> = await asyncEnv.getAllAsync();
+  const logLevel: "debug" | "info" = asyncEnv.get("LOG_LEVEL");
+  return [
+    name,
+    everythingFlag,
+    asyncPort,
+    databaseUrl,
+    shards,
+    asyncAll,
+    logLevel,
+    sameShape,
+    bothWays,
+  ] as const;
 }
 
 export { methods };

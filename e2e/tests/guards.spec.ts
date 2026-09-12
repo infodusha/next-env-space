@@ -8,8 +8,12 @@ import { expect, test } from "@playwright/test";
  */
 const guards = {
   "async-schema": [
-    'Key "APP_NAME" of the "guard-async" env space validates asynchronously.',
-    "give the key a schema without async refinements",
+    'Key "APP_NAME" of the "guard-async" env space validates asynchronously',
+    "so get() cannot read it. Use getAsync() instead.",
+  ],
+  "async-schema-all": [
+    'Keys "APP_NAME", "FEATURE_LABEL" of the "guard-async-all" env space validate asynchronously',
+    "so getAll() cannot read them. Use getAllAsync() instead.",
   ],
   "duplicate-name": [
     'Env space "guard-duplicate" is created twice with different keys.',

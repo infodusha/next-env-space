@@ -62,14 +62,20 @@ Every value arrives as `string | undefined`, so the schema is where it turns int
 else — coercion, a default, a boolean, a parsed JSON document:
 
 ```ts
+const json = z.string().transform((raw, ctx) => {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    ctx.addIssue({ code: "custom", message: "not valid JSON" });
+    return z.NEVER;
+  }
+});
+
 export const publicEnv = createEnvSpace(
   {
     PORT: z.coerce.number().default(3000),
     DEBUG: z.stringbool().default(false),
-    SERVICE_URLS: z.preprocess(
-      (raw) => JSON.parse(raw as string) as unknown,
-      z.record(z.string(), z.url()),
-    ),
+    SERVICE_URLS: json.pipe(z.record(z.string(), z.url())),
   },
   { name: "public" },
 );
@@ -77,8 +83,42 @@ export const publicEnv = createEnvSpace(
 publicEnv.get("SERVICE_URLS"); // Record<string, string>
 ```
 
-Schemas have to validate synchronously: the values are parsed on the spot, so a key with an
-async refinement fails on its first read.
+The transform reports a value it cannot parse as an issue rather than throwing: zod retries a
+transform that threw asynchronously, which turns the key into
+[one that validates asynchronously](#a-schema-that-validates-asynchronously), and `get()`
+refuses it.
+
+### A schema that validates asynchronously
+
+An async refinement or transform — a lookup, a check against another service — answers with
+a promise, so its key is read with `getAsync()` alone: `get()` throws on that key and names
+it, and `getAll()` throws as soon as the space has one, pointing at `getAllAsync()`. Every
+other key of the space keeps answering `get()`.
+
+```ts
+export const serverEnv = createEnvSpace(
+  {
+    DATABASE_URL: z.url().refine(async (url) => canConnect(url), {
+      message: "is not reachable",
+    }),
+    LOG_LEVEL: z.enum(["debug", "info"]).default("info"),
+  },
+  { name: "server" },
+);
+
+serverEnv.get("LOG_LEVEL"); // "debug" | "info"
+serverEnv.get("DATABASE_URL"); // throws: the key validates asynchronously
+await serverEnv.getAsync("DATABASE_URL"); // string, once the refinement has run
+```
+
+The refinement runs once, on the first read of the space, like every other schema. The
+asynchronous reads then wait for every such key of the space before they answer, so that a
+rejection names every bad value at once; a read of a key that validated on the spot is not
+held back. `<ClientEnvScript />` and `<ClientEnvProvider />` wait the same way before they
+serialise, so a value the refinement turns down fails the render on the server, where a
+synchronous one would. In a client component, `use(space.getAsync(...))` on such a key
+suspends until the schema has answered — put a `<Suspense>` boundary above the component;
+on a synchronous key the promise is handed back already settled and nothing suspends.
 
 ## Send a space to the browser
 
@@ -314,7 +354,9 @@ export function register() {
 ```
 
 `register()` runs outside any request; `getAllAsync()` answers there too, with the same
-values — there is just nothing to `await`, so the synchronous read says it straighter.
+values — there is just nothing to `await`, so the synchronous read says it straighter. A
+space with a key that validates asynchronously is the exception: `getAll()` refuses it, so
+`await getAllAsync()` is the read that checks it.
 
 ### One build, many environments
 
@@ -350,9 +392,11 @@ the `node` environment.
 
 The returned space exposes:
 
-- `get(key)` / `getAll()` — synchronous reads
+- `get(key)` / `getAll()` — synchronous reads; throw on a key whose schema validates
+  asynchronously
 - `getAsync(key)` / `getAllAsync()` — asynchronous reads, the only ones that work inside a
-  Server Component render; in a client component, safe to unwrap with `use()`
+  Server Component render and the only ones that answer a key whose schema validates
+  asynchronously; in a client component, safe to unwrap with `use()`
 - `name`, `keys`, `schema`
 
 [Where each read works](#where-each-read-works) maps both onto every calling context.
@@ -385,7 +429,10 @@ build.
 
 - The whole space is parsed on first read and cached for the lifetime of the process, so a
   bad value fails fast rather than at the call site that happens to need it — and the error
-  names every bad value at once, not one per restart.
+  names every bad value at once, not one per restart. A schema that validates asynchronously
+  starts on that first read too, and the asynchronous reads await it.
+- A schema that throws instead of reporting issues — a transform that could not parse the
+  value — is reported as an invalid value of its key, with what it threw.
 - A key the space does not declare throws in `get()` and rejects in `getAsync()` rather than
   reading as `undefined`.
 - Two spaces under one `name` overwrite each other on the client. That is harmless while

@@ -55,6 +55,24 @@ export const providedNestedEnv = createEnvSpace(
 );
 
 /**
+ * Published by the `(async)` layout. One key validates asynchronously — an
+ * async transform stands in for a lookup — so only the asynchronous reads
+ * answer it, while the key next to it keeps answering `get()`.
+ */
+export const asyncEnv = createEnvSpace(
+  {
+    ASYNC_VALUE: z.string().transform(async (value) => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
+      });
+      return value.toUpperCase();
+    }),
+    ASYNC_SIBLING: z.string(),
+  },
+  { name: "async" },
+);
+
+/**
  * Published by the `(broken)` layout, but backed by a value the schema rejects:
  * the raw value still has to reach the browser, so a read there fails on the
  * validation error rather than on a missing space.

@@ -17,6 +17,8 @@ export const buildTimeEnv = {
   SESSION_SECRET: "build-time-session-secret",
   BROKEN_URL: "https://build-time.example.com",
   BROKEN_COUNT: "86420",
+  ASYNC_VALUE: "build-time-async",
+  ASYNC_SIBLING: "build-time-sibling",
 } as const;
 
 export const runtimeEnv = {
@@ -34,6 +36,9 @@ export const runtimeEnv = {
   BROKEN_URL: "not-a-url",
   // Rejected by z.coerce.number(), to fail alongside BROKEN_URL.
   BROKEN_COUNT: "not-a-number",
+  // Upper-cased by an async transform, so the parsed value differs from the raw one.
+  ASYNC_VALUE: "runtime-async",
+  ASYNC_SIBLING: "runtime-sibling",
 } as const;
 
 /** Never set anywhere — the space declares it `optional()`. */

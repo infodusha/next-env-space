@@ -60,6 +60,7 @@ would silently test the build before it.
 | `/prefetch`             | a link whose prefetch reaches `/prefetch/target` first       |
 | `/prefetch/target`      | module-scope reads in a page below a loading boundary        |
 | `/async-env`            | `space.getAsync()` on an otherwise static route              |
+| `/async-schema`         | a key whose schema validates asynchronously, in every read   |
 | `/module-scope`         | a module-scope read rendered into a prerender                |
 | `/module-scope/dynamic` | the same module-scope value on a dynamic route               |
 | `/action`               | `get()` and `getAsync()` inside a Server Action              |
@@ -80,7 +81,8 @@ the ones under `(bare)` do not, which is what lets `/render-guard` be prerendere
 at build time, `/async-env` prove that the prerender opt-out really ran, and
 `/soft-nav` reach that layout for the first time from the browser. The ones under
 `(provided)` sit below two nested `<ClientEnvProvider />` instead, so no inline script
-reaches them at all. `/broken` sits under `(broken)`, whose layout publishes a space the
+reaches them at all. `/async-schema` sits under `(async)`, whose layout publishes
+the one space with a key that validates asynchronously. `/broken` sits under `(broken)`, whose layout publishes a space the
 schema rejects: the render fails on the server and Next serves its error document, so the
 group's `error.tsx` is what the browser shows.
 

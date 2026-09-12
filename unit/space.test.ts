@@ -166,22 +166,105 @@ describe("getAsync", () => {
   });
 });
 
+describe("a key whose schema validates asynchronously", () => {
+  const asyncShape = {
+    UNIT_NAME: z.string(),
+    UNIT_CHECKED: z
+      .string()
+      .refine((value) => Promise.resolve(value !== "rejected"), {
+        message: "was rejected",
+      }),
+  };
+
+  function createAsyncSpace(checked: string) {
+    process.env.UNIT_NAME = "app";
+    process.env.UNIT_CHECKED = checked;
+    return createSpace(asyncShape);
+  }
+
+  it("is refused by get() and getAll(), which point at the asynchronous reads", () => {
+    const space = createAsyncSpace("fine");
+
+    assert.equal(space.get("UNIT_NAME"), "app", "the other keys still answer");
+    assert.throws(() => space.get("UNIT_CHECKED"), {
+      message:
+        /^Key "UNIT_CHECKED" of the "unit-\d+" env space validates asynchronously — .+ — so get\(\) cannot read it\. Use getAsync\(\) instead\.$/u,
+    });
+    assert.throws(() => space.getAll(), {
+      message: /so getAll\(\) cannot read it\. Use getAllAsync\(\) instead\.$/u,
+    });
+  });
+
+  it("is awaited by getAsync(), which answers a marked promise once the schema has", async () => {
+    const space = createAsyncSpace("fine");
+
+    const first = space.getAsync("UNIT_CHECKED");
+    assert.equal(isFulfilled(first), false, "use() has to suspend on this one");
+    assert.equal(await first, "fine");
+
+    const second = space.getAsync("UNIT_CHECKED");
+    assert.ok(isFulfilled(second), "and not on the render that follows");
+    assert.equal(settled(second).value, "fine");
+
+    assert.deepEqual(await space.getAllAsync(), {
+      UNIT_NAME: "app",
+      UNIT_CHECKED: "fine",
+    });
+  });
+
+  it("does not hold back getAsync() of a key that answered on the spot", () => {
+    const space = createAsyncSpace("fine");
+
+    const promise = space.getAsync("UNIT_NAME");
+
+    assert.ok(isFulfilled(promise));
+    assert.equal(settled(promise).value, "app");
+  });
+
+  it("rejects the asynchronous reads that touch it with the value the schema turned down", async () => {
+    const space = createAsyncSpace("rejected");
+    const message =
+      /^Environment variable UNIT_CHECKED of the "unit-\d+" env space is not valid: was rejected$/u;
+
+    assert.equal(space.get("UNIT_NAME"), "app");
+    assert.equal(await space.getAsync("UNIT_NAME"), "app");
+    await assert.rejects(space.getAsync("UNIT_CHECKED"), { message });
+    await assert.rejects(space.getAllAsync(), { message });
+  });
+
+  it("is awaited by the publishers, so a value the schema turns down fails the render", async () => {
+    assert.equal(
+      (await readShippedEnv(createAsyncSpace("fine"))).failure,
+      undefined,
+    );
+
+    const { rawEnv, failure } = await readShippedEnv(
+      createAsyncSpace("rejected"),
+    );
+    assert.equal(rawEnv.UNIT_CHECKED, "rejected");
+    assert.match(
+      failure?.message ?? "",
+      /UNIT_CHECKED .* is not valid: was rejected$/u,
+    );
+  });
+});
+
 describe("readShippedEnv", () => {
-  it("hands out the raw values of the keys, with nothing to report", () => {
+  it("hands out the raw values of the keys, with nothing to report", async () => {
     const space = createReadySpace();
 
-    assert.deepEqual(readShippedEnv(space), {
+    assert.deepEqual(await readShippedEnv(space), {
       rawEnv: { UNIT_NAME: "app", UNIT_COUNT: "42", UNIT_OPTIONAL: undefined },
       failure: undefined,
     });
   });
 
-  it("hands out the raw values alongside the failure when they do not parse", () => {
+  it("hands out the raw values alongside the failure when they do not parse", async () => {
     process.env.UNIT_NAME = "app";
     process.env.UNIT_COUNT = "not-a-number";
     const space = createSpace(unitShape);
 
-    const { rawEnv, failure } = readShippedEnv(space);
+    const { rawEnv, failure } = await readShippedEnv(space);
 
     assert.equal(rawEnv.UNIT_COUNT, "not-a-number");
     assert.ok(failure instanceof Error);
@@ -191,10 +274,10 @@ describe("readShippedEnv", () => {
     );
   });
 
-  it("parses the space on the way, so the reads that follow are served from the cache", () => {
+  it("parses the space on the way, so the reads that follow are served from the cache", async () => {
     const space = createReadySpace();
 
-    assert.equal(readShippedEnv(space).failure, undefined);
+    assert.equal((await readShippedEnv(space)).failure, undefined);
 
     process.env.UNIT_COUNT = "7";
     assert.equal(space.get("UNIT_COUNT"), 42);
@@ -204,6 +287,7 @@ describe("readShippedEnv", () => {
     const space = createReadySpace();
     const lookalike = { ...space };
 
+    // Not a rejection: there is no space to read, so nothing to hand a promise for.
     assert.throws(() => readShippedEnv(lookalike as typeof space), {
       message:
         /^Env space "unit-\d+" was not created by createEnvSpace\(\) of this package instance\.$/u,

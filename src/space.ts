@@ -6,7 +6,7 @@ import {
   assertReadAllowed,
   claimName,
 } from "./guards.js";
-import { parseEnv } from "./parse.js";
+import { parseEnv, type ParsedSpace } from "./parse.js";
 import { readRawEnv, type EnvRuntime, type ReadContext } from "./raw-env.js";
 import { isMissingRequestScope } from "./request-scope.js";
 import type { EnvSchema, ParsedEnv } from "./schema.js";
@@ -36,14 +36,18 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * Route Handlers and in Server Actions. Throws where `next build` would
    * capture the value — a Server Component it prerenders, `generateStaticParams`,
    * a cached function, a Route Handler it prerenders; use `getAsync` in the
-   * component. Throws as well on a key the schema has not declared, and on a
-   * space that did not reach the browser — except on the
+   * component. Throws as well on a key the schema has not declared, on a key
+   * whose schema validates asynchronously — only `getAsync` reads that one —
+   * and on a space that did not reach the browser — except on the
    * error document Next serves for a failed server render, where it answers
    * `undefined` and reports the missing space once the page has booted, so a
    * read at module scope of instrumentation-client.ts does not stop that boot.
    */
   get<TKey extends keyof TSchema>(key: TKey): ParsedEnv<TSchema>[TKey];
-  /** Reads the whole space at once, with the same rules as `get`. */
+  /**
+   * Reads the whole space at once, with the same rules as `get`: one key whose
+   * schema validates asynchronously is enough for it to throw.
+   */
   getAll(): ParsedEnv<TSchema>;
   /**
    * Reads a single variable inside a Server Component. Opts the render out of
@@ -55,7 +59,8 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * of and `next build` would capture the value all the same —
    * `generateStaticParams`, a cached function, a Route Handler it prerenders —
    * and on a key the schema has not declared. Every failure is a rejection,
-   * never a synchronous throw.
+   * never a synchronous throw. Waits for a schema that validates
+   * asynchronously, and is the only read that answers such a key.
    */
   getAsync<TKey extends keyof TSchema>(
     key: TKey,
@@ -94,7 +99,8 @@ export interface CreateEnvSpace {
    * `process.env` at runtime, each validated with its own Standard Schema —
    * zod, valibot, arktype or any other library that implements the spec. The
    * whole space is parsed on the first read and cached for the lifetime of the
-   * process.
+   * process. A key whose schema validates asynchronously is read with
+   * `getAsync` alone.
    *
    * @param schema A shape with one schema per key: `{ FOO: z.string() }`.
    * @param options `name` — the key the raw values are published under on the
@@ -117,7 +123,7 @@ export interface ShippedEnv {
   readonly failure: Error | undefined;
 }
 
-const shippers = new WeakMap<object, () => ShippedEnv>();
+const shippers = new WeakMap<object, () => Promise<ShippedEnv>>();
 
 export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
   return function createEnvSpace<TSchema extends EnvSchema>(
@@ -131,18 +137,18 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
     claimName(name, keys);
 
-    let cachedEnv: ParsedEnv<TSchema> | null = null;
+    let cached: ParsedSpace<TSchema> | null = null;
 
-    function parseOnce(rawEnv: RawEnv): ParsedEnv<TSchema> {
-      cachedEnv ??= parseEnv(schema, rawEnv, name);
-      return cachedEnv;
+    function parseOnce(rawEnv: RawEnv): ParsedSpace<TSchema> {
+      cached ??= parseEnv(schema, rawEnv, name);
+      return cached;
     }
 
-    function readAllEnv(readContext: ReadContext | null): ParsedEnv<TSchema> {
-      return cachedEnv ?? parseOnce(readRawEnv(name, readContext));
+    function readAllEnv(readContext: ReadContext | null): ParsedSpace<TSchema> {
+      return cached ?? parseOnce(readRawEnv(name, readContext));
     }
 
-    function readSyncEnv(): ParsedEnv<TSchema> | undefined {
+    function readSyncEnv(): ParsedSpace<TSchema> | undefined {
       try {
         return readAllEnv(null);
       } catch (error) {
@@ -162,7 +168,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
     function getAll(): ParsedEnv<TSchema> {
       assertReadAllowed(name, "getAll()", true);
-      return readSyncEnv() ?? noValues();
+      return readSyncEnv()?.getAll() ?? noValues();
     }
 
     function get<TKey extends keyof TSchema>(
@@ -170,7 +176,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     ): ParsedEnv<TSchema>[TKey] {
       assertKnownKey(schema, name, key);
       assertReadAllowed(name, `get('${String(key)}')`, true);
-      return readSyncEnv()?.[key] as ParsedEnv<TSchema>[TKey];
+      return readSyncEnv()?.get(key) as ParsedEnv<TSchema>[TKey];
     }
 
     function optOutOfPrerender(): Promise<void> {
@@ -186,24 +192,26 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
     function readAsync<TValue>(
       call: string,
-      pick: (env: ParsedEnv<TSchema>) => TValue,
+      read: (parsed: ParsedSpace<TSchema>) => Promise<TValue>,
     ): Promise<TValue> {
       assertReadAllowed(name, call, false);
 
       const optedOut = optOutOfPrerender();
       if (isFulfilled(optedOut)) {
         assertOptedOut(runtime, name);
-        return fulfilled(pick(readAllEnv(runtime.readContextRawEnv)));
+        return read(readAllEnv(runtime.readContextRawEnv));
       }
 
       return optedOut.then(() => {
         assertOptedOut(runtime, name);
-        return pick(readAllEnv(runtime.readContextRawEnv));
+        return read(readAllEnv(runtime.readContextRawEnv));
       });
     }
 
     function getAllAsync(): Promise<ParsedEnv<TSchema>> {
-      return rejectOnThrow(() => readAsync("getAllAsync()", (env) => env));
+      return rejectOnThrow(() =>
+        readAsync("getAllAsync()", (parsed) => parsed.getAllAsync()),
+      );
     }
 
     function getAsync<TKey extends keyof TSchema>(
@@ -211,15 +219,17 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     ): Promise<ParsedEnv<TSchema>[TKey]> {
       return rejectOnThrow(() => {
         assertKnownKey(schema, name, key);
-        return readAsync(`getAsync('${String(key)}')`, (env) => env[key]);
+        return readAsync(`getAsync('${String(key)}')`, (parsed) =>
+          parsed.getAsync(key),
+        );
       });
     }
 
-    function ship(): ShippedEnv {
+    async function ship(): Promise<ShippedEnv> {
       const source = readRawEnv(name, null);
       const rawEnv = Object.fromEntries(keys.map((key) => [key, source[key]]));
       try {
-        parseOnce(source);
+        await parseOnce(source).getAllAsync();
         return { rawEnv, failure: undefined };
       } catch (error) {
         return {
@@ -247,7 +257,7 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
 
 export function readShippedEnv<TSchema extends EnvSchema>(
   space: EnvSpace<TSchema>,
-): ShippedEnv {
+): Promise<ShippedEnv> {
   const ship = shippers.get(space);
   if (ship === undefined) {
     throw new Error(

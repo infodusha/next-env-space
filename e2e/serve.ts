@@ -4,13 +4,14 @@ import path from "node:path";
 
 // `.ts` specifiers: Node runs this file directly, stripping the types, and
 // resolves the extension it is given rather than mapping it back from `.js`.
-import { buildTimeEnv, ports, runtimeEnv } from "./env.ts";
+import { ports, runtimeEnv } from "./env.ts";
 import { cacheFixtureDir, fixtureDir, nextBinOf, rootDir } from "./paths.ts";
 
 /**
  * The `webServer` command of the Playwright config, once per fixture: builds
- * the app with `buildTimeEnv`, then serves it with `runtimeEnv`, which is what
- * makes "read at runtime" an observable property rather than a claim.
+ * the app with none of its variables set — the build the README promises —
+ * then serves it with `runtimeEnv`, which is what makes "read at runtime" an
+ * observable property rather than a claim.
  *
  * Both steps live here rather than in a `globalSetup` because Playwright starts
  * `webServer` first — its plugin setup tasks run ahead of the global setups —
@@ -34,18 +35,22 @@ if (!existsSync(path.join(rootDir, "dist", "index.js"))) {
   );
 }
 
-// Next keeps a build cache that survives an env change, and two runs differ
-// only by env, so a stale build would be served back.
+// Next keeps a build cache that does not watch the package under test, so a
+// stale build would be served back.
 rmSync(path.join(appDir, ".next"), { recursive: true, force: true });
+
+// Whatever the shell that runs the suite exports, the build sees none of the
+// fixture's variables.
+const buildEnv = Object.fromEntries(
+  Object.entries(process.env).filter(
+    ([key]) => !Object.hasOwn(runtimeEnv, key),
+  ),
+);
 
 execFileSync(process.execPath, [nextBin, "build"], {
   cwd: appDir,
   stdio: "inherit",
-  env: {
-    ...process.env,
-    ...buildTimeEnv,
-    NEXT_TELEMETRY_DISABLED: "1",
-  },
+  env: { ...buildEnv, NEXT_TELEMETRY_DISABLED: "1" },
 });
 
 const server = spawn(

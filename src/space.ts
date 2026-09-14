@@ -7,6 +7,7 @@ import {
   claimName,
 } from "./guards.js";
 import { parseEnv } from "./parse.js";
+import { isBuildPhase } from "./process-env.js";
 import { readRawEnv, type EnvRuntime, type ReadContext } from "./raw-env.js";
 import { isMissingRequestScope } from "./request-scope.js";
 import type { EnvSchema, ParsedEnv } from "./schema.js";
@@ -36,7 +37,10 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * Route Handlers and in Server Actions. Throws where `next build` would
    * capture the value — a Server Component it prerenders, `generateStaticParams`,
    * a cached function, a Route Handler it prerenders; use `getAsync` in the
-   * component. Throws as well on a key the schema has not declared, and on a
+   * component. Wherever else `next build` reaches it — module scope, the SSR
+   * pass of a static shell — it answers `undefined` and parses nothing: the
+   * values are the running server's, which evaluates the module again.
+   * Throws as well on a key the schema has not declared, and on a
    * space that did not reach the browser — except on the
    * error document Next serves for a failed server render, where it answers
    * `undefined` and reports the missing space once the page has booted, so a
@@ -51,11 +55,11 @@ export interface EnvSpace<TSchema extends EnvSchema = EnvSchema> {
    * Where Next has no request to attach to — module scope of a server module,
    * `register()` in instrumentation.ts, a cached function the running server
    * fills — there is no prerender either, so it resolves with what the
-   * synchronous `get` reads there. Rejects where there is nothing to opt out
-   * of and `next build` would capture the value all the same —
-   * `generateStaticParams`, a cached function, a Route Handler it prerenders —
-   * and on a key the schema has not declared. Every failure is a rejection,
-   * never a synchronous throw.
+   * synchronous `get` reads there, `undefined` during `next build` included.
+   * Rejects where there is nothing to opt out of and `next build` would
+   * capture the value all the same — `generateStaticParams`, a cached
+   * function, a Route Handler it prerenders — and on a key the schema has not
+   * declared. Every failure is a rejection, never a synchronous throw.
    */
   getAsync<TKey extends keyof TSchema>(
     key: TKey,
@@ -93,8 +97,8 @@ export interface CreateEnvSpace {
    * Creates an env space: a group of environment variables read from
    * `process.env` at runtime, each validated with its own Standard Schema —
    * zod, valibot, arktype or any other library that implements the spec. The
-   * whole space is parsed on the first read and cached for the lifetime of the
-   * process.
+   * whole space is parsed on the first read the running server does — `next
+   * build` parses nothing — and cached for the lifetime of the process.
    *
    * @param schema A shape with one schema per key: `{ FOO: z.string() }`.
    * @param options `name` — the key the raw values are published under on the
@@ -139,7 +143,13 @@ export function createEnvSpaceWith(runtime: EnvRuntime): CreateEnvSpace {
     }
 
     function readAllEnv(readContext: ReadContext | null): ParsedEnv<TSchema> {
-      return cachedEnv ?? parseOnce(readRawEnv(name, readContext));
+      if (cachedEnv !== null) {
+        return cachedEnv;
+      }
+      if (isBuildPhase()) {
+        return noValues();
+      }
+      return parseOnce(readRawEnv(name, readContext));
     }
 
     function readSyncEnv(): ParsedEnv<TSchema> | undefined {

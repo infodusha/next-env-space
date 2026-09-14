@@ -2,9 +2,11 @@ import { moduleScopeAppName } from "@/module-scope-env";
 
 /**
  * Renders a module-scope read into a page that stays static. This is the
- * documented capture: the page bakes the value the build machine saw, which
- * is why rendering a module-scope read into a prerender is the anti-pattern —
- * the read itself is fine.
+ * documented capture: next build parses nothing, so the constant held
+ * undefined while the page was prerendered, and the static HTML shows an
+ * empty spot where the runtime value belongs — which is why rendering a
+ * module-scope read into a prerender is the anti-pattern; the read itself is
+ * fine.
  */
 export default function ModuleScopePage() {
   return (

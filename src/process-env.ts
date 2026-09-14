@@ -1,6 +1,7 @@
 declare const process: {
   readonly env: {
     readonly __NEXT_CACHE_COMPONENTS?: boolean | string;
+    readonly NEXT_PHASE?: string;
     readonly NODE_ENV?: string;
   };
 };
@@ -16,3 +17,7 @@ export const cacheComponentsEnabled: boolean =
 
 export const isProduction: boolean =
   hasProcess && process.env.NODE_ENV === "production";
+
+export function isBuildPhase(): boolean {
+  return hasProcess && process.env.NEXT_PHASE === "phase-production-build";
+}

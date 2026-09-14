@@ -21,12 +21,15 @@ Playwright project and web server:
   its build: it imports `next-env-space/server` from a client component, and
   the suite asserts the `server-only` marker rejects it.
 
-## The point of two sets of values
+## Why the build runs without variables
 
-[`env.ts`](./env.ts) holds `buildTimeEnv` and `runtimeEnv`. `next build` runs with
-the first set, `next start` with the second. Every value a test asserts on is a
-runtime value, so a variable that got inlined at build time fails the suite
-instead of passing it quietly.
+[`env.ts`](./env.ts) holds `runtimeEnv`, and only that. `next build` runs with
+none of the fixture's variables set — [`serve.ts`](./serve.ts) strips them from
+the environment it inherits — which checks the package's headline promise on
+every run: a build that needs no value. `next start` then runs with
+`runtimeEnv`, and every value a test asserts on is a runtime value, so a read
+that happened at build time fails the build or leaves an empty spot instead of
+passing the suite quietly.
 
 ## Running
 

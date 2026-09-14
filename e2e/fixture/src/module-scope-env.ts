@@ -3,7 +3,10 @@ import { publicEnv } from "@/env";
 /**
  * Read at module scope, the way the README calls safe: the module is evaluated
  * again in the server process, so this constant holds the runtime value there.
- * The build must survive this module being evaluated during a prerender.
+ * The build has to survive this module being evaluated with no variable set —
+ * while it collects the config of the pages that import it, and again during
+ * a prerender: next build parses nothing, so the constant holds undefined
+ * there.
  */
 export const moduleScopeAppName = publicEnv.get("APP_NAME");
 

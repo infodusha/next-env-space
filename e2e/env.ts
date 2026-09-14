@@ -1,23 +1,9 @@
 /**
- * The two sets of values the fixture app sees. The build runs with
- * `buildTimeEnv`, the server that serves the tests runs with `runtimeEnv`, so
- * every value the tests assert on proves the read happened at runtime.
+ * The values the fixture app sees. `next build` runs with none of them set —
+ * the build the README promises — and the server that serves the tests runs
+ * with `runtimeEnv`, so every value a test asserts on proves the read happened
+ * at runtime.
  */
-
-export const buildTimeEnv = {
-  APP_NAME: "build-time-app",
-  REQUEST_TIMEOUT_SECONDS: "97531",
-  FEATURE_ENABLED: "FALSE",
-  UNSAFE_VALUE: "build-time-unsafe",
-  FEATURE_LABEL: "build-time-label",
-  UNPUBLISHED_VALUE: "build-time-unpublished",
-  PROVIDED_LABEL: "build-time-provided",
-  PROVIDED_COUNT: "13579",
-  PROVIDED_NESTED: "build-time-late",
-  SESSION_SECRET: "build-time-session-secret",
-  BROKEN_URL: "https://build-time.example.com",
-  BROKEN_COUNT: "86420",
-} as const;
 
 export const runtimeEnv = {
   APP_NAME: "runtime-app",

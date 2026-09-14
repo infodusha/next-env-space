@@ -4,9 +4,9 @@ import { publicEnv } from "@/env";
 
 /**
  * Reads the public space synchronously, the way a client component would.
- * When this sits in the static part of a route, the prerender bakes the build
- * machine's values into the shell — the documented trap — and the published
- * script heals them on hydration.
+ * When this sits in the static part of a route, the prerender bakes the
+ * undefined a build-time read answers into the shell — the documented trap —
+ * and the published script heals it on hydration.
  */
 export function PublicEnvView() {
   const env = publicEnv.getAll();

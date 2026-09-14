@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildTimeEnv, runtimeEnv } from "../env.js";
+import { runtimeEnv } from "../env.js";
 import { readEnvSpaces } from "../html.js";
 
 test.describe("a dynamic hole under Cache Components", () => {
@@ -23,7 +23,6 @@ test.describe("a dynamic hole under Cache Components", () => {
   }) => {
     const html = await (await request.get("/")).text();
 
-    expect(html).not.toContain(buildTimeEnv.APP_NAME);
     expect(readEnvSpaces(html).public?.APP_NAME).toBe(runtimeEnv.APP_NAME);
   });
 
@@ -41,7 +40,7 @@ test.describe("a dynamic hole under Cache Components", () => {
 
 test.describe("a synchronous client read baked into the shell", () => {
   test("is healed to the runtime values on hydration", async ({ page }) => {
-    // The response body carries the build-time capture (see shell.spec.ts);
+    // The shell carries the empty capture of the build (see shell.spec.ts);
     // the page the visitor ends up with must not.
     await page.goto("/client");
 

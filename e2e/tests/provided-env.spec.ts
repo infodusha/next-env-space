@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildTimeEnv, runtimeEnv } from "../env.js";
+import { runtimeEnv } from "../env.js";
 import { readEnvScripts } from "../html.js";
 
 test.describe("a space provided through context", () => {
@@ -40,9 +40,7 @@ test.describe("a space provided through context", () => {
     expect(await page.evaluate(() => window.__ENV_SPACES__)).toBeUndefined();
   });
 
-  test("carries the runtime values, not the build-time ones", async ({
-    request,
-  }) => {
+  test("carries the runtime values", async ({ request }) => {
     const html = await (await request.get("/provided")).text();
 
     for (const key of [
@@ -50,9 +48,6 @@ test.describe("a space provided through context", () => {
       "PROVIDED_COUNT",
       "PROVIDED_NESTED",
     ] as const) {
-      expect(html, `the build-time value of ${key} leaked`).not.toContain(
-        buildTimeEnv[key],
-      );
       expect(html).toContain(runtimeEnv[key]);
     }
   });

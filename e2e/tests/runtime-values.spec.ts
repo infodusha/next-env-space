@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { buildTimeEnv, runtimeEnv } from "../env.js";
+import { runtimeEnv } from "../env.js";
 
 test.describe("values come from the running server, not from the build", () => {
   test("a Server Component reads them with getAsync()", async ({ page }) => {
@@ -13,18 +13,6 @@ test.describe("values come from the running server, not from the build", () => {
       runtimeEnv.REQUEST_TIMEOUT_SECONDS,
     );
     await expect(page.getByTestId("server-feature-enabled")).toHaveText("true");
-  });
-
-  test("no build-time value survives anywhere in the response", async ({
-    request,
-  }) => {
-    const html = await (await request.get("/")).text();
-
-    for (const [key, value] of Object.entries(buildTimeEnv)) {
-      expect(html, `the build-time value of ${key} leaked`).not.toContain(
-        value,
-      );
-    }
   });
 
   test("every key is parsed with its own schema", async ({ page }) => {

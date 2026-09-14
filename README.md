@@ -222,6 +222,12 @@ In the table, _the script_ is `<ClientEnvScript />` and _the provider_ is `<Clie
 | `generateStaticParams`                                 | ❌ throws: it only runs at build | ❌ throws: it only runs at build                                 |
 | inside a `"use cache"` function                        | ❌ throws at build time          | ❌ throws at build time                                          |
 
+`next build` evaluates the module scope of every page, layout and Route Handler while it
+collects their config, and a static prerender evaluates whatever it imports. Nothing is parsed
+there: a read the guards let through answers `undefined` during the build, and the running
+server, which evaluates every module again, parses the space on its first read.
+[One build, many environments](#one-build-many-environments) has what follows from that.
+
 A module that Next imports lazily inside a render — a dynamic `import()` in a Server
 Component, or a page module that an older Next only reached while resolving metadata for a
 prefetch — runs its module scope inside that render, where React cannot tell a module-scope
@@ -264,9 +270,9 @@ dynamic holes and need a `<Suspense>` boundary around them:
 
 Put that boundary **above everything that reads the space**, not tightly around
 `ClientEnvScript` — the readers have to be inside it too. Whatever stays outside belongs to
-the static shell and is rendered during `next build`, where a read still answers, with the
-build machine's value: it then sits in the prerendered HTML and mismatches the runtime value
-on hydration.
+the static shell and is rendered during `next build`, where a read still answers, with
+`undefined` — the build parses nothing: an empty spot then sits in the prerendered HTML and
+mismatches the runtime value on hydration.
 
 `getAsync` is the way out of that, in a client component as much as in a Server one — the
 value is produced per request and the build fails if no boundary encloses it. What has no
@@ -318,15 +324,18 @@ values — there is just nothing to `await`, so the synchronous read says it str
 
 ### One build, many environments
 
-Nothing in the package needs the real values at `next build`: the publishers and `getAsync`
-opt out of prerendering, so a `Dockerfile` can build the app without a single variable set
-and let `docker run -e` or the orchestrator supply them to `next start`. The exception is a
-read at module scope of a module the build evaluates: it sees whatever the build machine
-has, and a required key that is missing there fails the build, which is the right call — the
-value would have been baked in otherwise. Every other read the build reaches — a Server
-Component, `generateStaticParams`, a cached function, a prerendered Route Handler — throws
-right there instead of capturing. `output: "standalone"` changes nothing, `node server.js`
-reads the same `process.env`.
+Nothing in the package needs the real values at `next build`, and nothing is parsed there.
+The publishers and `getAsync` opt out of prerendering; a read the build reaches all the same
+— the module scope of a page it evaluates to collect the page's config, a client component it
+prerenders — answers `undefined` and leaves the schema alone. So a `Dockerfile` can build the
+app without a single variable set and let `docker run -e` or the orchestrator supply them to
+`next start`, where the first read parses the space. That `undefined` is what a module-scope
+read holds while the build evaluates the module, so store it, do not compute with it:
+`new URL(publicEnv.get("API_URL"))` at module scope throws on it during the build — derive
+where the value is used. Every other read the build reaches — a Server Component,
+`generateStaticParams`, a cached function, a prerendered Route Handler — throws right there
+instead of capturing. `output: "standalone"` changes nothing, `node server.js` reads the same
+`process.env`.
 
 ### Testing
 
@@ -383,9 +392,10 @@ build.
 
 ## Notes
 
-- The whole space is parsed on first read and cached for the lifetime of the process, so a
-  bad value fails fast rather than at the call site that happens to need it — and the error
-  names every bad value at once, not one per restart.
+- The whole space is parsed on the first read the running server does — `next build` parses
+  nothing — and cached for the lifetime of the process, so a bad value fails fast rather than
+  at the call site that happens to need it — and the error names every bad value at once, not
+  one per restart.
 - A key the space does not declare throws in `get()` and rejects in `getAsync()` rather than
   reading as `undefined`.
 - Two spaces under one `name` overwrite each other on the client. That is harmless while

@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.2](https://github.com/infodusha/next-env-space/compare/v3.3.1...v3.3.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* force getAsync for a metadata route ([cbc952e](https://github.com/infodusha/next-env-space/commit/cbc952e4d6273b2f17da4425ae76a07e70a5eed8))
+
 ## [3.3.1](https://github.com/infodusha/next-env-space/compare/v3.3.0...v3.3.1) (2026-09-14)
 
 

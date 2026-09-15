@@ -3,7 +3,12 @@ import * as react from "react";
 import { isProduction } from "./process-env.js";
 import type { EnvRuntime } from "./raw-env.js";
 import type { EnvSchema } from "./schema.js";
-import { currentWorkUnit, isBuildTime, isCacheScope } from "./work-unit.js";
+import {
+  currentWorkUnit,
+  isBuildTime,
+  isCacheScope,
+  isPinnedStatic,
+} from "./work-unit.js";
 
 const takenSpaces = new Map<string, readonly string[]>();
 
@@ -98,9 +103,18 @@ export function assertReadAllowed(
     unit.phase === "action" &&
     unit.type !== "request"
   ) {
+    const pinned = isPinnedStatic();
+    if (!sync && !pinned) {
+      return;
+    }
+
     throw new Error(
       `${read} is called in a Route Handler while Next prerenders it at build time, so the value would be captured into the static response. ` +
-        `Make the handler dynamic — await connection() before the read, or drop dynamic = "force-static".`,
+        (pinned
+          ? `Its dynamic = "force-static" or "error" keeps connection() from opting the route out, so drop that config, or read the value outside and pass it in. `
+          : `Use getAsync(), which opts the route out of prerendering, or await connection() before the read. `) +
+        `Next prerenders every Route Handler that reads no request data, the metadata routes — /favicon.ico, /manifest.*, /robots.txt, /sitemap.xml — among them. ` +
+        `The read may also sit at the module scope of a module the handler imports lazily, where it runs inside the prerender.`,
     );
   }
 

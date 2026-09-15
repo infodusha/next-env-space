@@ -89,7 +89,7 @@ group's `error.tsx` is what the browser shows.
 
 `/contexts/*` and `/api/contexts/*` each put both reads into one context of the
 README table — `generateMetadata`, `generateStaticParams`, a `force-static` Route
-Handler, `unstable_cache()` filled at build and by the running server,
+Handler and one the build prerenders only by default, `unstable_cache()` filled at build and by the running server,
 `instrumentation.ts`, `src/proxy.ts` — and report `ok:<value>` or
 `err:<message>` instead of throwing, so the spec can assert on the outcome.
 `/contexts/client` does the same in the browser, from the module scope of a

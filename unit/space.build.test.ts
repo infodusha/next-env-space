@@ -63,15 +63,17 @@ describe("a read while next build runs", () => {
   it("still lets the guards refuse a read the build would capture", async () => {
     const space = createSpace(unitShape);
 
-    await atBuildTime(() =>
-      inWorkUnit({ type: "prerender-legacy", phase: "action" }, async () => {
-        assert.throws(() => space.get("UNIT_NAME"), {
-          message: /while Next prerenders it at build time/u,
-        });
-        await assert.rejects(space.getAsync("UNIT_NAME"), {
-          message: /while Next prerenders it at build time/u,
-        });
-      }),
+    await atBuildTime(
+      () =>
+        inWorkUnit({ type: "prerender-legacy", phase: "action" }, async () => {
+          assert.throws(() => space.get("UNIT_NAME"), {
+            message: /while Next prerenders it at build time/u,
+          });
+          await assert.rejects(space.getAsync("UNIT_NAME"), {
+            message: /while Next prerenders it at build time/u,
+          });
+        }),
+      { forceStatic: true },
     );
 
     inWorkUnit({ type: "generate-static-params" }, () => {

@@ -206,21 +206,21 @@ export function AppName() {
 
 In the table, _the script_ is `<ClientEnvScript />` and _the provider_ is `<ClientEnvProvider />`.
 
-| where                                                  | `get()`                          | `getAsync()`                                                     |
-| ------------------------------------------------------ | -------------------------------- | ---------------------------------------------------------------- |
-| Server Component render, `generateMetadata`            | ❌ throws at build time          | ✅ works, opts the route out of prerendering                     |
-| Client Component render                                | ⚙️ works with the script         | ⚙️ works with the provider or the script, unwrapped with `use()` |
-| Client Component, outside the render (handler, effect) | ⚙️ works with the script         | ⚙️ works with the script                                         |
-| module scope of a client module                        | ⚙️ works with the script         | ⚙️ works with the script                                         |
-| module scope of a server module                        | ✅ works                         | ✅ works                                                         |
-| Route Handler                                          | ✅ works                         | ✅ works                                                         |
-| Route Handler with `dynamic = "force-static"`          | ❌ throws at build time          | ❌ throws at build time                                          |
-| Server Action                                          | ✅ works                         | ✅ works                                                         |
-| `proxy.ts` (middleware)                                | ✅ works                         | ✅ works                                                         |
-| `instrumentation.ts` — `register()`                    | ✅ works                         | ✅ works                                                         |
-| `instrumentation-client.ts`                            | ⚙️ works with the script         | ⚙️ works with the script                                         |
-| `generateStaticParams`                                 | ❌ throws: it only runs at build | ❌ throws: it only runs at build                                 |
-| inside a `"use cache"` function                        | ❌ throws at build time          | ❌ throws at build time                                          |
+| where                                                        | `get()`                                 | `getAsync()`                                                     |
+| ------------------------------------------------------------ | --------------------------------------- | ---------------------------------------------------------------- |
+| Server Component render, `generateMetadata`                  | ❌ throws at build time                 | ✅ works                                                         |
+| Client Component render                                      | ⚙️ works with the script                | ⚙️ works with the provider or the script, unwrapped with `use()` |
+| Client Component, outside the render (handler, effect)       | ⚙️ works with the script                | ⚙️ works with the script                                         |
+| module scope of a client module                              | ⚙️ works with the script                | ⚙️ works with the script                                         |
+| module scope of a server module                              | ✅ works                                | ✅ works                                                         |
+| Route Handler, metadata route (`robots.ts`, `sitemap.ts`, …) | ❌ throws where the build prerenders it | ✅ works                                                         |
+| Route Handler with `dynamic = "force-static"` or `"error"`   | ❌ throws at build time                 | ❌ throws at build time                                          |
+| Server Action                                                | ✅ works                                | ✅ works                                                         |
+| `proxy.ts` (middleware)                                      | ✅ works                                | ✅ works                                                         |
+| `instrumentation.ts` — `register()`                          | ✅ works                                | ✅ works                                                         |
+| `instrumentation-client.ts`                                  | ⚙️ works with the script                | ⚙️ works with the script                                         |
+| `generateStaticParams`                                       | ❌ throws: it only runs at build        | ❌ throws: it only runs at build                                 |
+| inside a `"use cache"` function                              | ❌ throws at build time                 | ❌ throws at build time                                          |
 
 `next build` evaluates the module scope of every page, layout and Route Handler while it
 collects their config, and a static prerender evaluates whatever it imports. Nothing is parsed
@@ -236,15 +236,21 @@ build output is being written: on the running server the module-scope read goes 
 with the runtime value, during `next build` it still throws. A module the build has to
 evaluate is better imported statically.
 
-Three more places let the build capture a value without any render to opt out of, and both
-reads throw there, naming the place. `generateStaticParams` only ever runs at build, so its
-reads could only see the build machine — compute the params without them. A cached function
-— `"use cache"`, `unstable_cache()` — and a `force-static` Route Handler run at build to
-fill the cache or the static response, and whatever they read is served long after: read the
-value outside and pass it in as an argument, or make the route dynamic — `await connection()`
-before the read. The same cached function or Route Handler run by the server — a cache miss,
-an ISR revalidation — reads the runtime value and is left alone, like every render the
-running server does.
+Three more places let the build capture a value without a React render to opt out of, and
+the guard throws there, naming the place. `generateStaticParams` only ever runs at build, so
+its reads could only see the build machine — compute the params without them; both reads
+throw. A cached function — `"use cache"`, `unstable_cache()` — runs at build to fill the
+cache, and whatever it reads is served long after: read the value outside and pass it in as
+an argument; both reads throw. A Route Handler that reads no request data is prerendered
+into a static response the same way, and so are the metadata routes — `/favicon.ico`,
+`/manifest.*`, `/robots.txt`, `/sitemap.xml` — so `get()` throws there, while `getAsync()`
+calls `connection()` and turns the route dynamic, like in a Server Component. Only
+`dynamic = "force-static"` or `"error"` makes `getAsync()` throw as well: the first turns
+`connection()` into a no-op, the second forbids it, so the value really would be captured.
+A read that seems to come from nowhere may sit at the module scope of a module the handler
+imports lazily, which runs inside the prerender. The same cached function or Route Handler
+run by the server — a cache miss, an ISR revalidation — reads the runtime value and is left
+alone, like every render the running server does.
 
 A read at module scope of `instrumentation-client.ts` runs before Next boots the page, so a
 throw there stops the boot and hides every error Next would otherwise show, this one included:
@@ -333,7 +339,7 @@ app without a single variable set and let `docker run -e` or the orchestrator su
 read holds while the build evaluates the module, so store it, do not compute with it:
 `new URL(publicEnv.get("API_URL"))` at module scope throws on it during the build — derive
 where the value is used. Every other read the build reaches — a Server Component,
-`generateStaticParams`, a cached function, a prerendered Route Handler — throws right there
+`generateStaticParams`, a cached function, `get()` in a prerendered Route Handler — throws right there
 instead of capturing. `output: "standalone"` changes nothing, `node server.js` reads the same
 `process.env`.
 

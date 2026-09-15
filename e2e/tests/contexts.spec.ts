@@ -61,7 +61,30 @@ test.describe("a force-static Route Handler", () => {
 
     expect(reads.sync).toContain("while Next prerenders it at build time");
     expect(reads.sync).toContain("captured into the static response");
+    expect(reads.sync).toContain('dynamic = "force-static" or "error"');
     expect(reads.async).toContain("while Next prerenders it at build time");
+    expect(reads.async).toContain("drop that config");
+    expect(
+      existsSync(path.join(appDir, "api", "contexts", "static-route.body")),
+    ).toBe(true);
+  });
+});
+
+test.describe("a Route Handler the build prerenders by default", () => {
+  test("get() is rejected at build, getAsync() makes the route dynamic", async ({
+    request,
+  }) => {
+    const response = await request.get("/api/contexts/default-static-route");
+    const reads = (await response.json()) as { sync: string; async: string };
+
+    // The sync read ran at request time too — the route was never baked.
+    expect(reads.sync).toBe(`ok:${runtimeEnv.APP_NAME}`);
+    expect(reads.async).toBe(`ok:${runtimeEnv.APP_NAME}`);
+    expect(
+      existsSync(
+        path.join(appDir, "api", "contexts", "default-static-route.body"),
+      ),
+    ).toBe(false);
   });
 });
 

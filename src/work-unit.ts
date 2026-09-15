@@ -39,3 +39,8 @@ export function isBuildTime(
     !isProduction && unit !== undefined && buildLikePrerenders.has(unit.type)
   );
 }
+
+export function isPinnedStatic(): boolean {
+  const work = workAsyncStorage.getStore();
+  return work?.forceStatic === true || work?.dynamicShouldError === true;
+}
